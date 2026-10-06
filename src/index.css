@@ -1,0 +1,785 @@
+:root {
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  
+  /* Palet tenang: aksen biru netral, latar terang bersih */
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f1f5f9;
+  --bg-muted: #e2e8f0;
+  
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+  
+  --border-color: #e2e8f0;
+  --border-focus: #475569;
+  
+  --accent: #2563eb;
+  --accent-text: #ffffff;
+  
+  --income: #059669;
+  --expense: #dc2626;
+  
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-app: #0b0f17;
+    --bg-surface: #131b26;
+    --bg-subtle: #1e293b;
+    --bg-muted: #334155;
+    
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-dim: #64748b;
+    
+    --border-color: #243042;
+    --border-focus: #94a3b8;
+    
+    --accent: #3b82f6;
+    --accent-text: #ffffff;
+    
+    --income: #10b981;
+    --expense: #ef4444;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  line-height: 1.5;
+  font-size: 15px;
+  overflow-x: hidden;
+  width: 100%;
+  min-height: 100vh;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  max-width: 500px; /* Standar Layar Ponsel Poco */
+  margin: 0 auto;
+  position: relative;
+  background-color: var(--bg-surface);
+}
+
+/* Navigasi Atas */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background-color: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  padding: calc(12px + var(--safe-top)) 16px 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.topbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  display: inline-block;
+}
+
+.topbar-title {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.topbar-back-btn {
+  min-height: 32px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+/* Desktop nav & actions (disembunyikan di HP) */
+.desktop-nav,
+.desktop-actions {
+  display: none;
+}
+
+/* Area Konten Utama */
+.content-area {
+  flex: 1;
+  padding: 16px 16px calc(76px + var(--safe-bottom)) 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Grid Layout Responsif Default (Mobile) */
+.desktop-stat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+}
+
+.desktop-main-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.main-grid-left,
+.main-grid-right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.more-menu-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.grid-responsive {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.grid-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Penyesuaian Responsif Layar PC / Desktop */
+@media (min-width: 768px) {
+  #root {
+    max-width: 1240px; /* Lebar lapang proporsional untuk PC */
+    background-color: transparent;
+    border-left: none;
+    border-right: none;
+  }
+
+  .topbar {
+    padding: 14px 28px;
+    background-color: var(--bg-surface);
+    border-radius: 0 0 12px 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  }
+
+  .desktop-nav {
+    display: flex !important;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .desktop-nav-link {
+    background: transparent;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  .desktop-nav-link:hover {
+    background-color: var(--bg-subtle);
+    color: var(--text-main);
+  }
+
+  .desktop-nav-link.active {
+    background-color: var(--bg-subtle);
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .desktop-actions {
+    display: flex !important;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .content-area {
+    padding: 24px 0 60px 0 !important;
+    gap: 22px !important;
+  }
+
+  /* Baris 4 Metrik di PC */
+  .desktop-stat-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 18px !important;
+  }
+
+  /* 2 Kolom Utama di PC */
+  .desktop-main-grid {
+    display: grid !important;
+    grid-template-columns: 380px 1fr !important;
+    gap: 22px !important;
+    align-items: start !important;
+  }
+
+  .grid-responsive {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 22px !important;
+    align-items: start !important;
+  }
+
+  /* Menu Pengaturan dalam Grid 3 Kolom di PC */
+  .more-menu-grid {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 16px !important;
+  }
+
+  /* Sembunyikan Bilah Navigasi Bawah & Tombol Melayang HP di Layar PC */
+  .bottom-nav {
+    display: none !important;
+  }
+
+  .floating-fab {
+    display: none !important;
+  }
+
+  .mobile-only-btn {
+    display: none !important;
+  }
+}
+
+/* Filter Pill Group */
+.filter-pill-group {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filter-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-pill:hover {
+  background: var(--bg-subtle);
+  color: var(--text-main);
+}
+
+.filter-pill.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+/* Navigasi Bawah (Hanya untuk Layar Ponsel) */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 500px;
+  z-index: 30;
+  background-color: var(--bg-surface);
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-around;
+  padding-bottom: var(--safe-bottom);
+}
+
+.nav-item {
+  flex: 1;
+  height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+
+.nav-item.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.nav-item svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Tombol Floating Tambah Cepat */
+.floating-fab {
+  position: fixed;
+  bottom: calc(70px + var(--safe-bottom));
+  right: 20px;
+  z-index: 25;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  color: var(--accent-text);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+/* Kotak / Kartu Bersih */
+.card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+}
+
+.card-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Komponen Kartu Statistik Metrik */
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Kartu Peringatan Tagihan */
+.bill-alert-card {
+  border-left: 4px solid var(--accent);
+  background: linear-gradient(to right, var(--bg-subtle), var(--bg-surface));
+}
+
+.bill-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+/* Dompet Visual List */
+.wallet-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.wallet-card-item {
+  padding: 12px;
+  border-radius: 8px;
+  background-color: var(--bg-subtle);
+}
+
+.wallet-bar-track {
+  width: 100%;
+  height: 5px;
+  background-color: var(--bg-muted);
+  border-radius: 3px;
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+
+.wallet-bar-fill {
+  height: 100%;
+  background-color: var(--accent);
+  border-radius: 3px;
+}
+
+/* Daftar Transaksi Bersih */
+.tx-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.tx-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.tx-row:last-child {
+  border-bottom: none;
+}
+
+.tx-type-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.badge-inc {
+  background-color: rgba(5, 150, 105, 0.12);
+  color: var(--income);
+}
+
+.badge-exp {
+  background-color: rgba(220, 38, 38, 0.12);
+  color: var(--expense);
+}
+
+.badge-trf {
+  background-color: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+/* Bar Filter Transaksi */
+.filter-bar-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Kartu Menu Interaktif (Menu Navigasi di Lainnya) */
+.menu-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: all 0.15s ease;
+}
+
+.menu-card:hover {
+  background-color: var(--bg-subtle);
+  border-color: var(--border-focus);
+}
+
+.menu-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 2px;
+}
+
+.menu-card-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* Nominal Rupiah */
+.amount-text {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  font-weight: 600;
+}
+
+.amount-income {
+  color: var(--income);
+}
+
+.amount-expense {
+  color: var(--expense);
+}
+
+.amount-transfer {
+  color: var(--text-main);
+}
+
+/* Formulir & Input */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.form-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 15px;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.form-input-amount {
+  font-size: 24px;
+  font-weight: 700;
+  text-align: right;
+  letter-spacing: -0.02em;
+}
+
+/* Tombol */
+.btn {
+  min-height: 44px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  user-select: none;
+}
+
+.btn-primary {
+  background-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.btn-secondary {
+  background-color: var(--bg-subtle);
+  color: var(--text-main);
+  border-color: var(--border-color);
+}
+
+.btn-danger {
+  background-color: transparent;
+  color: var(--expense);
+  border-color: var(--border-color);
+}
+
+.btn-full {
+  width: 100%;
+}
+
+/* Modal Bottom Drawer */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.modal-sheet {
+  background-color: var(--bg-surface);
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  padding: 20px 20px calc(24px + var(--safe-bottom)) 20px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-top: 1px solid var(--border-color);
+}
+
+@media (min-width: 768px) {
+  .modal-backdrop {
+    align-items: center;
+    justify-content: center;
+  }
+
+  .modal-sheet {
+    border-radius: 16px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 85vh;
+  }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.modal-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* Segment Control */
+.segment-control {
+  display: flex;
+  background-color: var(--bg-subtle);
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 16px;
+}
+
+.segment-btn {
+  flex: 1;
+  min-height: 38px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.segment-btn.active {
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  font-weight: 600;
+}
+
+/* Category Chips */
+.category-chips {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.chip-btn {
+  min-height: 44px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: center;
+  word-break: break-word;
+}
+
+.chip-btn.selected {
+  border-color: var(--accent);
+  background-color: var(--bg-subtle);
+  font-weight: 600;
+}
+
+/* Daftar Baris */
+.row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+  min-height: 48px;
+}
+
+.row-item:last-child {
+  border-bottom: none;
+}
+
+.badge {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background-color: var(--bg-muted);
+  color: var(--text-muted);
+  font-weight: 500;
+}
