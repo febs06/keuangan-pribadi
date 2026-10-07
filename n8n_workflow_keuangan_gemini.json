@@ -1,0 +1,405 @@
+{
+  "name": "Keuangan Pribadi - Telegram Bot & Gemini OCR",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "node-telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "keuangan-pribadi-telegram"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ String($json.message.chat.id) }}",
+              "value2": "2037807600"
+            }
+          ]
+        }
+      },
+      "id": "node-filter-owner",
+      "name": "Hanya Chat ID Pemilik",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ Boolean($json.message.photo && $json.message.photo.length > 0) }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "node-check-photo",
+      "name": "Apakah Foto / Struk?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.telegram.org/bot8811525485:AAFCAdkMGVMo42vVXgpMc9ylZo0e4htbvpE/getFile",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "file_id",
+              "value": "={{ $json.message.photo[$json.message.photo.length - 1].file_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-telegram-get-file-info",
+      "name": "Ambil Info File Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        920,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.telegram.org/file/bot8811525485:AAFCAdkMGVMo42vVXgpMc9ylZo0e4htbvpE/{{ $json.result.file_path }}",
+        "responseFormat": "file",
+        "options": {}
+      },
+      "id": "node-download-image",
+      "name": "Unduh Gambar Struk",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1140,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const binaryData = items[0].binary.data;\nconst base64Image = binaryData.data;\nconst mimeType = binaryData.mimeType || 'image/jpeg';\n\nreturn [{\n  json: {\n    base64Image,\n    mimeType\n  }\n}];"
+      },
+      "id": "node-prepare-gemini-payload",
+      "name": "Siapkan Payload Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "ISI_GEMINI_API_KEY_ANDA"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Kamu adalah asisten keuangan pribadi. Analisis gambar struk belanja, nota, atau bukti transfer berikut. Kembalikan HANYA JSON MURNI tanpa markdown (tanpa ```json) dengan format:\\n{\\n  \\\"type\\\": \\\"expense\\\" atau \\\"income\\\",\\n  \\\"amount\\\": 50000,\\n  \\\"wallet_name\\\": \\\"BCA\\\" atau \\\"Dana\\\" atau \\\"Jago\\\" atau \\\"Dompet\\\" (sesuai logo/nama bank/e-wallet jika terbaca, kosongkan jika tidak ada),\\n  \\\"category_or_source\\\": \\\"Makan/jajan\\\" atau \\\"Belanja\\\" atau \\\"Transport\\\" atau \\\"Kebutuhan\\\",\\n  \\\"notes\\\": \\\"Nama toko atau keterangan singkat\\\",\\n  \\\"date\\\": \\\"YYYY-MM-DD\\\"\\n}\\nJika tidak yakin dompetnya, kosongkan wallet_name. Nominal harus angka murni tanpa titik/koma/Rp.\"\n        },\n        {\n          \"inlineData\": {\n            \"mimeType\": \"{{ $json.mimeType }}\",\n            \"data\": \"{{ $json.base64Image }}\"\n          }\n        }\n      ]\n    }\n  ],\n  \"generationConfig\": {\n    \"responseMimeType\": \"application/json\"\n  }\n}",
+        "options": {}
+      },
+      "id": "node-gemini-ocr",
+      "name": "Gemini AI Vision OCR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1580,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseText = items[0].json.candidates[0].content.parts[0].text;\nlet parsed = {};\ntry {\n  parsed = JSON.parse(responseText.trim().replace(/^```json/, '').replace(/```$/, ''));\n} catch (e) {\n  parsed = {\n    type: 'expense',\n    amount: 0,\n    notes: 'Gagal mengekstrak data struk',\n    category_or_source: 'Kebutuhan'\n  };\n}\n\nreturn [{\n  json: {\n    p_chat_id: '2037807600',\n    p_type: parsed.type || 'expense',\n    p_amount: Math.round(Number(parsed.amount) || 0),\n    p_wallet_name: parsed.wallet_name || null,\n    p_category_or_source: parsed.category_or_source || null,\n    p_notes: parsed.notes || 'Dari Foto Struk',\n    p_date: parsed.date || null\n  }\n}];"
+      },
+      "id": "node-parse-gemini-json",
+      "name": "Parse JSON Gemini",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://vhhvubrmmybuwpqcdikv.supabase.co/rest/v1/rpc/create_transaction_from_bot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_uT6gq95Eq23QhdZJd3ufyw_3SFbyDk6"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_uT6gq95Eq23QhdZJd3ufyw_3SFbyDk6"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"p_chat_id\": \"{{ $json.p_chat_id }}\",\n  \"p_type\": \"{{ $json.p_type }}\",\n  \"p_amount\": {{ $json.p_amount }},\n  \"p_wallet_name\": {{ $json.p_wallet_name ? '\"' + $json.p_wallet_name + '\"' : 'null' }},\n  \"p_category_or_source\": {{ $json.p_category_or_source ? '\"' + $json.p_category_or_source + '\"' : 'null' }},\n  \"p_notes\": {{ $json.p_notes ? '\"' + $json.p_notes + '\"' : 'null' }},\n  \"p_date\": {{ $json.p_date ? '\"' + $json.p_date + '\"' : 'null' }}\n}",
+        "options": {}
+      },
+      "id": "node-supabase-insert",
+      "name": "Catat ke Database Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        2020,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "2037807600",
+        "text": "={{ $json.reply_message || $json.error || 'Transaksi berhasil diproses.' }}",
+        "additionalFields": {}
+      },
+      "id": "node-telegram-send-reply",
+      "name": "Balas Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2240,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.message.text ? $json.message.text.trim().toLowerCase() : '' }}",
+              "value2": "/saldo"
+            }
+          ]
+        }
+      },
+      "id": "node-is-command-saldo",
+      "name": "Apakah Cek Saldo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        920,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://vhhvubrmmybuwpqcdikv.supabase.co/rest/v1/rpc/get_bot_balance_summary",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_uT6gq95Eq23QhdZJd3ufyw_3SFbyDk6"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_uT6gq95Eq23QhdZJd3ufyw_3SFbyDk6"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"p_chat_id\": \"2037807600\"\n}",
+        "options": {}
+      },
+      "id": "node-supabase-get-balance",
+      "name": "Ambil Ringkasan Saldo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        1140,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "2037807600",
+        "text": "={{ $json.reply_message || 'Gagal mengambil saldo.' }}",
+        "additionalFields": {}
+      },
+      "id": "node-telegram-reply-saldo",
+      "name": "Balas Info Saldo",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1360,
+        380
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Hanya Chat ID Pemilik",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hanya Chat ID Pemilik": {
+      "main": [
+        [
+          {
+            "node": "Apakah Foto / Struk?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apakah Foto / Struk?": {
+      "main": [
+        [
+          {
+            "node": "Ambil Info File Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apakah Cek Saldo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ambil Info File Telegram": {
+      "main": [
+        [
+          {
+            "node": "Unduh Gambar Struk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unduh Gambar Struk": {
+      "main": [
+        [
+          {
+            "node": "Siapkan Payload Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siapkan Payload Gemini": {
+      "main": [
+        [
+          {
+            "node": "Gemini AI Vision OCR",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini AI Vision OCR": {
+      "main": [
+        [
+          {
+            "node": "Parse JSON Gemini",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse JSON Gemini": {
+      "main": [
+        [
+          {
+            "node": "Catat ke Database Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Catat ke Database Supabase": {
+      "main": [
+        [
+          {
+            "node": "Balas Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apakah Cek Saldo?": {
+      "main": [
+        [
+          {
+            "node": "Ambil Ringkasan Saldo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ambil Ringkasan Saldo": {
+      "main": [
+        [
+          {
+            "node": "Balas Info Saldo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
