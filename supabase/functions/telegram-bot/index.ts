@@ -1,5 +1,6 @@
 // Supabase Edge Function: telegram-bot
 // Menerima Webhook Telegram, mengekstrak struk/nota/bukti transfer via Gemini Vision,
+// mengenali pertanyaan bahasa sehari-hari (cek saldo, greeting, dll),
 // mencatat transaksi ke database Supabase, dan membalas ke pengguna di Telegram.
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -41,9 +42,31 @@ async function sendTelegramMessage(chatId: string | number, text: string) {
   }
 }
 
-// Fallback Parser Cepat untuk Bahasa Indonesia jika Gemini sedang kendala
+// Fallback Parser Cepat untuk Bahasa Indonesia jika Gemini offline / timeout
 function fallbackParseIndonesianText(text: string) {
   const lower = text.toLowerCase().trim();
+
+  // Deteksi pertanyaan saldo / cek saldo bahasa santai
+  if (
+    /(berapa|cek|sisa|total|ada berapa|info|ringkasan).*(saldo|uang|duit|rekening)/i.test(lower) ||
+    /(saldo|uang|duit|rekening).*(berapa|cek|sisa|total)/i.test(lower) ||
+    /^(\/saldo|saldo|cek saldo)$/i.test(lower)
+  ) {
+    let wallet_name: string | null = null;
+    if (/\bbca\b/i.test(lower)) wallet_name = "BCA";
+    else if (/\bdana\b/i.test(lower)) wallet_name = "Dana";
+    else if (/\bjago\b/i.test(lower)) wallet_name = "Jago";
+    else if (/\bdompet\b|\btunai\b|\bcash\b/i.test(lower)) wallet_name = "Dompet";
+
+    return { intent: "check_balance", wallet_name };
+  }
+
+  // Deteksi sapaan
+  if (/^(halo|hai|hi|hey|p|tes|test|pagi|siang|sore|malam|assalamualaikum)/i.test(lower)) {
+    return { intent: "greeting" };
+  }
+
+  // Deteksi pencatatan transaksi
   let type: "expense" | "income" = "expense";
   if (/nemu|dapat|dapet|gaji|terima|bonus|kembalian|cair|dikasih|masuk/i.test(lower)) {
     type = "income";
@@ -80,7 +103,7 @@ function fallbackParseIndonesianText(text: string) {
     else if (/wifi|listrik|air|pulsa|kuota|kos/i.test(lower)) category_or_source = "Tagihan";
   }
 
-  return { type, amount, wallet_name, category_or_source, notes: text, date: null };
+  return { intent: "record_transaction", type, amount, wallet_name, category_or_source, notes: text, date: null };
 }
 
 // Analisis Foto Struk / Nota dengan Gemini Vision
@@ -143,16 +166,17 @@ Aturan:
   throw new Error("Semua model Gemini Vision gagal memproses gambar.");
 }
 
-// Analisis Pesan Teks dengan Gemini (misal: "nemu duit 2ribu di laci")
+// Analisis Pesan Teks Bahasa Sehari-hari dengan Gemini
 async function analyzeTextWithGemini(text: string) {
-  const prompt = `Ekstrak kalimat pencatatan keuangan berikut menjadi JSON murni: "${text}"
-Format yang harus dikembalikan (tanpa markdown tambahan):
+  const prompt = `Kamu adalah asisten keuangan pribadi cerdas. Analisis pesan pengguna bahasa Indonesia berikut: "${text}"
+Tentukan maksud pengguna dan kembalikan JSON murni tanpa markdown:
 {
-  "type": "expense" atau "income",
-  "amount": 20000,
-  "wallet_name": "BCA" atau "Dana" atau "Jago" atau "Dompet",
-  "category_or_source": "Makan/jajan" atau "Transport" atau "Pemasukan Lain",
-  "notes": "keterangan singkat",
+  "intent": "check_balance" (jika menanyakan saldo/uang/sisa rekening) atau "record_transaction" (jika mencatat uang keluar/masuk) atau "greeting" (jika menyapa) atau "other",
+  "type": "expense" atau "income" atau null,
+  "amount": angka bulat nominal atau null,
+  "wallet_name": "BCA" atau "Dana" atau "Jago" atau "Dompet" atau null,
+  "category_or_source": kategori atau sumber ringkas atau null,
+  "notes": keterangan ringkas atau null,
   "date": null
 }`;
 
@@ -177,7 +201,7 @@ Format yang harus dikembalikan (tanpa markdown tambahan):
       const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
       const cleanJson = rawText.trim().replace(/^```json/, "").replace(/```$/, "").trim();
       const parsed = JSON.parse(cleanJson);
-      if (parsed.amount && parsed.amount > 0) {
+      if (parsed.intent) {
         return parsed;
       }
     } catch (err) {
@@ -185,7 +209,7 @@ Format yang harus dikembalikan (tanpa markdown tambahan):
     }
   }
 
-  // Jika semua endpoint AI sibuk / error, gunakan fallback parser cerdas
+  // Jika semua endpoint AI sibuk / error, gunakan fallback parser cerdas lokal
   console.log("Menggunakan fallback parser lokal untuk teks:", text);
   return fallbackParseIndonesianText(text);
 }
@@ -218,26 +242,12 @@ serve(async (req) => {
 
     // 1. Perintah Bantuan / Mulai
     if (text === "/start" || text === "/help") {
-      const welcome = `Halo Febri!\n\nBot Asisten Keuangan aktif 24 jam.\n\nCara pakai:\n1. Kirim foto struk, nota kasir, atau bukti transfer.\n2. Atau ketik pesan biasa, misal: "nemu duit 2ribu di laci" atau "jajan kopi 25rb bca"\n3. Ketik /saldo untuk cek saldo semua dompet.`;
+      const welcome = `Halo Febri! Asisten Keuangan aktif 24 jam.\n\nKamu bisa bicara dengan bahasa santai:\n• Tanya saldo: "berapa saldo sekarang?", "saldo bca berapa?"\n• Catat pengeluaran: "jajan kopi 25rb bca", "beli bensin 30000"\n• Catat pemasukan: "nemu duit 2ribu di laci", "gaji 5jt bca"\n• Kirim foto struk belanja / bukti transfer langsung ke chat ini.`;
       await sendTelegramMessage(chatId, welcome);
       return new Response("OK", { status: 200 });
     }
 
-    // 2. Perintah Cek Saldo (/saldo)
-    if (text.toLowerCase() === "/saldo") {
-      const { data, error } = await supabase.rpc("get_bot_balance_summary", {
-        p_chat_id: chatId,
-      });
-
-      if (error || !data?.success) {
-        await sendTelegramMessage(chatId, "Gagal mengambil data saldo: " + (error?.message || data?.error));
-      } else {
-        await sendTelegramMessage(chatId, data.reply_message);
-      }
-      return new Response("OK", { status: 200 });
-    }
-
-    // 3. Jika Pengguna Mengirim Gambar (Foto Struk / Bukti Transfer)
+    // 2. Jika Pengguna Mengirim Gambar (Foto Struk / Bukti Transfer)
     if (message.photo && message.photo.length > 0) {
       await sendTelegramMessage(chatId, "Sedang membaca struk/gambar via Gemini AI...");
 
@@ -296,31 +306,76 @@ serve(async (req) => {
       return new Response("OK", { status: 200 });
     }
 
-    // 4. Jika Pengguna Mengirim Teks Catat Transaksi Biasa
+    // 3. Jika Pengguna Mengirim Teks Bahasa Sehari-hari
     if (text) {
-      const parsedData = await analyzeTextWithGemini(text);
+      const lowerText = text.toLowerCase();
 
-      if (!parsedData.amount || parsedData.amount <= 0) {
-        await sendTelegramMessage(chatId, "Nominal tidak terbaca. Contoh:\n• nemu duit 2ribu di laci\n• jajan kopi 25rb bca\n• /saldo");
+      // Jalur Cepat (Fast-path): Cek saldo langsung tanpa perlu tunggu AI jika polanya jelas
+      const isQuickBalanceCheck =
+        lowerText === "/saldo" ||
+        /(berapa|cek|sisa|total|ada berapa|info|ringkasan).*(saldo|uang|duit|rekening)/i.test(lowerText) ||
+        /(saldo|uang|duit|rekening).*(berapa|cek|sisa|total)|^saldo$/i.test(lowerText);
+
+      if (isQuickBalanceCheck) {
+        const { data, error } = await supabase.rpc("get_bot_balance_summary", {
+          p_chat_id: chatId,
+        });
+
+        if (error || !data?.success) {
+          await sendTelegramMessage(chatId, "Gagal mengambil data saldo: " + (error?.message || data?.error));
+        } else {
+          await sendTelegramMessage(chatId, data.reply_message);
+        }
         return new Response("OK", { status: 200 });
       }
 
-      const { data: txResult, error: txError } = await supabase.rpc("create_transaction_from_bot", {
-        p_chat_id: chatId,
-        p_type: parsedData.type || "expense",
-        p_amount: Math.round(Number(parsedData.amount)),
-        p_wallet_name: parsedData.wallet_name || null,
-        p_category_or_source: parsedData.category_or_source || null,
-        p_notes: parsedData.notes || text,
-        p_date: parsedData.date || null,
-      });
+      // Analisis Pesan dengan Gemini AI
+      const parsedData = await analyzeTextWithGemini(text);
 
-      if (txError || !txResult?.success) {
-        await sendTelegramMessage(chatId, "Gagal mencatat transaksi: " + (txError?.message || txResult?.error));
-      } else {
-        await sendTelegramMessage(chatId, txResult.reply_message);
+      // A. Maksud: Menanyakan Saldo
+      if (parsedData.intent === "check_balance") {
+        const { data, error } = await supabase.rpc("get_bot_balance_summary", {
+          p_chat_id: chatId,
+        });
+
+        if (error || !data?.success) {
+          await sendTelegramMessage(chatId, "Gagal mengambil data saldo: " + (error?.message || data?.error));
+        } else {
+          await sendTelegramMessage(chatId, data.reply_message);
+        }
+        return new Response("OK", { status: 200 });
       }
 
+      // B. Maksud: Sapaan (Greeting)
+      if (parsedData.intent === "greeting") {
+        const replyGreeting = `Halo Febri! Ada yang bisa dibantu?\n\nKamu bisa langsung ketik:\n• "berapa saldo sekarang?"\n• "jajan kopi 25rb bca"\n• "nemu duit 2ribu di laci"\natau kirim foto struk belanja.`;
+        await sendTelegramMessage(chatId, replyGreeting);
+        return new Response("OK", { status: 200 });
+      }
+
+      // C. Maksud: Pencatatan Transaksi
+      if (parsedData.amount && parsedData.amount > 0) {
+        const { data: txResult, error: txError } = await supabase.rpc("create_transaction_from_bot", {
+          p_chat_id: chatId,
+          p_type: parsedData.type || "expense",
+          p_amount: Math.round(Number(parsedData.amount)),
+          p_wallet_name: parsedData.wallet_name || null,
+          p_category_or_source: parsedData.category_or_source || null,
+          p_notes: parsedData.notes || text,
+          p_date: parsedData.date || null,
+        });
+
+        if (txError || !txResult?.success) {
+          await sendTelegramMessage(chatId, "Gagal mencatat transaksi: " + (txError?.message || txResult?.error));
+        } else {
+          await sendTelegramMessage(chatId, txResult.reply_message);
+        }
+        return new Response("OK", { status: 200 });
+      }
+
+      // D. Maksud Lain / Tidak Dikenali
+      const helpMsg = `Saya belum memahami pesan tersebut.\n\nContoh yang bisa kamu ketik:\n• "berapa saldo sekarang?" (cek saldo)\n• "jajan bakso 20000 dana" (catat pengeluaran)\n• "nemu duit 50rb di saku" (catat pemasukan)\natau kirim foto struk kasir / bukti transfer.`;
+      await sendTelegramMessage(chatId, helpMsg);
       return new Response("OK", { status: 200 });
     }
 
