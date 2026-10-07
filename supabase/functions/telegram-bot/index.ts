@@ -1,6 +1,7 @@
 // Supabase Edge Function: telegram-bot
 // Menerima Webhook Telegram, mengekstrak struk/nota/bukti transfer via Gemini Vision,
-// mengenali pertanyaan bahasa sehari-hari (cek saldo, greeting, dll),
+// mengenali pertanyaan bahasa sehari-hari (cek saldo spesifik / semua dompet, greeting, dll),
+// mendukung atur saldo (misal: "di dana ada 600 perak"),
 // mendukung koreksi/ralat/pembatalan transaksi terakhir,
 // mencatat transaksi ke database Supabase, dan membalas ke pengguna di Telegram.
 
@@ -43,6 +44,32 @@ async function sendTelegramMessage(chatId: string | number, text: string) {
   }
 }
 
+// Ekstrak angka nominal bahasa Indonesia (mendukung "perak", "ribu", "rb", "k", "jt", dll)
+function extractIndonesianNominal(text: string): number {
+  const lower = text.toLowerCase();
+
+  // 1. Cek format "perak" (misal: 600 perak, 500 perak)
+  const perakMatch = lower.match(/(\d+)\s*perak/i);
+  if (perakMatch) {
+    return parseInt(perakMatch[1], 10);
+  }
+
+  // 2. Cek format standar nominal
+  const match = lower.match(/(?:rp\.?\s*)?(\d+(?:[\.,]\d+)?)\s*(ribu|rb|k|jt|juta|ribuen)?/i);
+  if (match) {
+    let num = parseFloat(match[1].replace(",", "."));
+    const unit = match[2];
+    if (unit === "ribu" || unit === "rb" || unit === "k" || unit === "ribuen") num *= 1000;
+    else if (unit === "jt" || unit === "juta") num *= 1000000;
+    else if (!unit && num < 1000 && match[1].includes(".")) {
+      num = parseInt(match[1].replace(/\./g, ""), 10);
+    }
+    return Math.round(num);
+  }
+
+  return 0;
+}
+
 // Fallback Parser Cepat untuk Bahasa Indonesia jika Gemini offline / timeout
 function fallbackParseIndonesianText(text: string) {
   const lower = text.toLowerCase().trim();
@@ -70,11 +97,25 @@ function fallbackParseIndonesianText(text: string) {
     return { intent: "correct_transaction", new_wallet_name };
   }
 
-  // 3. Deteksi pertanyaan saldo / cek saldo bahasa santai
+  // 3. Deteksi atur saldo / update saldo dompet (misal: "di dana ada 600 perak", "saldo bca ada 50rb")
   if (
-    /(berapa|cek|sisa|total|ada berapa|info|ringkasan).*(saldo|uang|duit|rekening)/i.test(lower) ||
-    /(saldo|uang|duit|rekening).*(berapa|cek|sisa|total)/i.test(lower) ||
-    /^(\/saldo|saldo|cek saldo)$/i.test(lower)
+    /(di\s+(dana|bca|jago|dompet|tunai)\s+ada\s+\d+)|(saldo\s+(dana|bca|jago|dompet|tunai)\s+(ada|jadi)\s+\d+)|(atur\s+saldo\s+(dana|bca|jago|dompet|tunai))/i.test(lower)
+  ) {
+    let wallet_name = "Dompet";
+    if (/\bbca\b/i.test(lower)) wallet_name = "BCA";
+    else if (/\bdana\b/i.test(lower)) wallet_name = "Dana";
+    else if (/\bjago\b/i.test(lower)) wallet_name = "Jago";
+    else if (/\bdompet\b|\btunai\b|\bcash\b/i.test(lower)) wallet_name = "Dompet";
+
+    const amount = extractIndonesianNominal(text);
+    return { intent: "set_balance", wallet_name, amount };
+  }
+
+  // 4. Deteksi pertanyaan saldo / cek saldo bahasa santai
+  if (
+    /(berapa|cek|sisa|total|ada berapa|info|ringkasan).*(saldo|uang|duit|rekening|dompet|bca|dana|jago)/i.test(lower) ||
+    /(saldo|uang|duit|rekening|dompet|bca|dana|jago).*(berapa|cek|sisa|total)/i.test(lower) ||
+    /^(\/saldo|saldo|cek saldo|cek dompet|cek bca|cek dana)$/i.test(lower)
   ) {
     let wallet_name: string | null = null;
     if (/\bbca\b/i.test(lower)) wallet_name = "BCA";
@@ -85,29 +126,18 @@ function fallbackParseIndonesianText(text: string) {
     return { intent: "check_balance", wallet_name };
   }
 
-  // 4. Deteksi sapaan
+  // 5. Deteksi sapaan
   if (/^(halo|hai|hi|hey|p|tes|test|pagi|siang|sore|malam|assalamualaikum)/i.test(lower)) {
     return { intent: "greeting" };
   }
 
-  // 5. Deteksi pencatatan transaksi
+  // 6. Deteksi pencatatan transaksi
   let type: "expense" | "income" = "expense";
   if (/nemu|dapat|dapet|gaji|terima|bonus|kembalian|cair|dikasih|masuk/i.test(lower)) {
     type = "income";
   }
 
-  let amount = 0;
-  const match = lower.match(/(?:rp\.?\s*)?(\d+(?:[\.,]\d+)?)\s*(ribu|rb|k|jt|juta|ribuen)?/i);
-  if (match) {
-    let num = parseFloat(match[1].replace(",", "."));
-    const unit = match[2];
-    if (unit === "ribu" || unit === "rb" || unit === "k" || unit === "ribuen") num *= 1000;
-    else if (unit === "jt" || unit === "juta") num *= 1000000;
-    else if (!unit && num < 1000 && match[1].includes(".")) {
-      num = parseInt(match[1].replace(/\./g, ""), 10);
-    }
-    amount = Math.round(num);
-  }
+  const amount = extractIndonesianNominal(text);
 
   let wallet_name: string | null = null;
   if (/\bbca\b/i.test(lower)) wallet_name = "BCA";
@@ -194,16 +224,17 @@ Aturan:
 async function analyzeTextWithGemini(text: string) {
   const prompt = `Kamu adalah asisten keuangan pribadi cerdas. Analisis pesan pengguna bahasa Indonesia berikut: "${text}"
 Identifikasi maksud pengguna secara cerdas:
-1. "correct_transaction": jika pengguna ingin meralat/mengoreksi transaksi terakhir (contoh: "bukan pake bca, tapi pake uang tunai", "bukan bca tapi dana", "ganti dompet ke dompet", "salah dompet", "ralat tadi 20rb")
-2. "delete_transaction": jika membatalkan/menghapus transaksi terakhir (contoh: "batalkan transaksi tadi", "hapus transaksi barusan", "ga jadi catat")
-3. "check_balance": jika menanyakan saldo/uang
-4. "record_transaction": jika mencatat transaksi baru
-5. "greeting": jika menyapa
-6. "other": lainnya
+1. "set_balance": jika pengguna menginformasikan atau mengatur saldo saat ini dari suatu dompet (contoh: "di dana ada 600 perak", "saldo bca ada 50rb", "atur saldo dompet jadi 100rb"). Catatan: "perak" berarti rupiah (contoh: 600 perak = 600).
+2. "correct_transaction": jika pengguna ingin meralat/mengoreksi transaksi terakhir (contoh: "bukan pake bca, tapi pake uang tunai", "bukan bca tapi dana", "ganti dompet ke dompet", "salah dompet", "ralat tadi 20rb")
+3. "delete_transaction": jika membatalkan/menghapus transaksi terakhir (contoh: "batalkan transaksi tadi", "hapus transaksi barusan", "ga jadi catat")
+4. "check_balance": jika menanyakan saldo/uang (contoh: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa")
+5. "record_transaction": jika mencatat transaksi baru (contoh: "jajan bakso 20rb", "nemu duit 2ribu")
+6. "greeting": jika menyapa (contoh: "halo", "hai")
+7. "other": lainnya
 
 Kembalikan format JSON murni:
 {
-  "intent": "correct_transaction" | "delete_transaction" | "check_balance" | "record_transaction" | "greeting" | "other",
+  "intent": "set_balance" | "correct_transaction" | "delete_transaction" | "check_balance" | "record_transaction" | "greeting" | "other",
   "new_wallet_name": "BCA" | "Dana" | "Jago" | "Dompet" | null,
   "new_amount": angka bulat positif atau null,
   "type": "expense" atau "income" atau null,
@@ -276,7 +307,7 @@ serve(async (req) => {
 
     // 1. Perintah Bantuan / Mulai
     if (text === "/start" || text === "/help") {
-      const welcome = `Halo Febri! Asisten Keuangan aktif 24 jam.\n\nKamu bisa bicara dengan bahasa santai:\n• Tanya saldo: "berapa saldo sekarang?", "saldo bca berapa?"\n• Catat pengeluaran: "tadi sore jajan geprek 18rb", "jajan kopi 25rb bca"\n• Ralat / Koreksi: "bukan pake bca, tapi pake uang tunai", "ralat tadi 20rb"\n• Batalkan: "batalkan transaksi tadi"\n• Kirim foto struk belanja / bukti transfer langsung ke chat ini.`;
+      const welcome = `Halo Febri! Asisten Keuangan aktif 24 jam.\n\nKamu bisa bicara dengan bahasa santai:\n• Tanya saldo: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa?"\n• Atur saldo: "di dana ada 600 perak", "saldo bca ada 50rb"\n• Catat pengeluaran: "tadi sore jajan geprek 18rb", "jajan kopi 25rb bca"\n• Ralat / Koreksi: "bukan pake bca, tapi pake uang tunai", "ralat tadi 20rb"\n• Batalkan: "batalkan transaksi tadi"\n• Kirim foto struk belanja / bukti transfer langsung ke chat ini.`;
       await sendTelegramMessage(chatId, welcome);
       return new Response("OK", { status: 200 });
     }
@@ -344,26 +375,7 @@ serve(async (req) => {
     if (text) {
       const lowerText = text.toLowerCase();
 
-      // Jalur Cepat (Fast-path): Cek saldo
-      const isQuickBalanceCheck =
-        lowerText === "/saldo" ||
-        /(berapa|cek|sisa|total|ada berapa|info|ringkasan).*(saldo|uang|duit|rekening)/i.test(lowerText) ||
-        /(saldo|uang|duit|rekening).*(berapa|cek|sisa|total)|^saldo$/i.test(lowerText);
-
-      if (isQuickBalanceCheck) {
-        const { data, error } = await supabase.rpc("get_bot_balance_summary", {
-          p_chat_id: chatId,
-        });
-
-        if (error || !data?.success) {
-          await sendTelegramMessage(chatId, "Gagal mengambil data saldo: " + (error?.message || data?.error));
-        } else {
-          await sendTelegramMessage(chatId, data.reply_message);
-        }
-        return new Response("OK", { status: 200 });
-      }
-
-      // Jalur Cepat: Hapus / Batalkan transaksi terakhir
+      // Jalur Cepat (Fast-path): Hapus / Batalkan transaksi terakhir
       const isQuickDelete =
         /(batal|batalkan|hapus|delete|cancel|ga jadi|gak jadi|nggak jadi).*(transaksi|tadi|barusan|terakhir)/i.test(lowerText) ||
         /^(batal|batalkan|hapus)$/i.test(lowerText);
@@ -384,7 +396,35 @@ serve(async (req) => {
       // Analisis Pesan dengan Gemini AI (Intent Detection)
       const parsedData = await analyzeTextWithGemini(text);
 
-      // A. Maksud: Koreksi Transaksi Terakhir (misal: "bukan pake bca, tapi pake uang tunai")
+      // A. Maksud: Mengatur / Memperbarui Saldo Dompet (misal: "di dana ada 600 perak")
+      if (parsedData.intent === "set_balance") {
+        let walletName = parsedData.wallet_name || null;
+        if (!walletName) {
+          if (/\bbca\b/i.test(lowerText)) walletName = "BCA";
+          else if (/\bdana\b/i.test(lowerText)) walletName = "Dana";
+          else if (/\bjago\b/i.test(lowerText)) walletName = "Jago";
+          else if (/dompet|tunai|cash|uang tunai/i.test(lowerText)) walletName = "Dompet";
+        }
+
+        const targetBalance = parsedData.amount !== null && parsedData.amount !== undefined
+          ? Math.round(Number(parsedData.amount))
+          : extractIndonesianNominal(text);
+
+        const { data, error } = await supabase.rpc("set_wallet_balance_from_bot", {
+          p_chat_id: chatId,
+          p_wallet_name: walletName,
+          p_target_balance: targetBalance,
+        });
+
+        if (error || !data?.success) {
+          await sendTelegramMessage(chatId, "Gagal memperbarui saldo: " + (error?.message || data?.error));
+        } else {
+          await sendTelegramMessage(chatId, data.reply_message);
+        }
+        return new Response("OK", { status: 200 });
+      }
+
+      // B. Maksud: Koreksi Transaksi Terakhir (misal: "bukan pake bca, tapi pake uang tunai")
       if (parsedData.intent === "correct_transaction") {
         let newWallet = parsedData.new_wallet_name || null;
         if (!newWallet) {
@@ -410,7 +450,7 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // B. Maksud: Batalkan Transaksi Terakhir
+      // C. Maksud: Batalkan Transaksi Terakhir
       if (parsedData.intent === "delete_transaction") {
         const { data, error } = await supabase.rpc("delete_last_transaction_from_bot", {
           p_chat_id: chatId,
@@ -424,10 +464,19 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // C. Maksud: Menanyakan Saldo
+      // D. Maksud: Menanyakan Saldo (Bisa spesifik 1 dompet atau seluruhnya)
       if (parsedData.intent === "check_balance") {
+        let targetWallet = parsedData.wallet_name || null;
+        if (!targetWallet) {
+          if (/\bbca\b/i.test(lowerText)) targetWallet = "BCA";
+          else if (/\bdana\b/i.test(lowerText)) targetWallet = "Dana";
+          else if (/\bjago\b/i.test(lowerText)) targetWallet = "Jago";
+          else if (/\bdompet\b|\btunai\b|\bcash\b/i.test(lowerText)) targetWallet = "Dompet";
+        }
+
         const { data, error } = await supabase.rpc("get_bot_balance_summary", {
           p_chat_id: chatId,
+          p_wallet_name: targetWallet,
         });
 
         if (error || !data?.success) {
@@ -438,14 +487,14 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // D. Maksud: Sapaan (Greeting)
+      // E. Maksud: Sapaan (Greeting)
       if (parsedData.intent === "greeting") {
-        const replyGreeting = `Halo Febri! Ada yang bisa dibantu?\n\nKamu bisa langsung ketik:\n• "berapa saldo sekarang?"\n• "jajan kopi 25rb bca"\n• "nemu duit 2ribu di laci"\n• Ralat: "bukan pake bca, tapi pake uang tunai"\natau kirim foto struk belanja.`;
+        const replyGreeting = `Halo Febri! Ada yang bisa dibantu?\n\nKamu bisa langsung ketik:\n• "berapa saldo sekarang?" atau "cek dompet dong"\n• "di dana ada 600 perak" (atur saldo)\n• "tadi sore jajan geprek 18rb"\n• Ralat: "bukan pake bca, tapi pake uang tunai"\natau kirim foto struk belanja.`;
         await sendTelegramMessage(chatId, replyGreeting);
         return new Response("OK", { status: 200 });
       }
 
-      // E. Maksud: Pencatatan Transaksi
+      // F. Maksud: Pencatatan Transaksi
       if (parsedData.amount && parsedData.amount > 0) {
         const { data: txResult, error: txError } = await supabase.rpc("create_transaction_from_bot", {
           p_chat_id: chatId,
@@ -465,8 +514,8 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // F. Maksud Lain / Tidak Dikenali
-      const helpMsg = `Saya belum memahami pesan tersebut.\n\nContoh yang bisa kamu ketik:\n• "berapa saldo sekarang?" (cek saldo)\n• "tadi sore jajan geprek 18rb" (catat pengeluaran)\n• "bukan bca, tapi tunai" (ralat transaksi terakhir)\n• "batalkan transaksi tadi" (hapus transaksi terakhir)\natau kirim foto struk kasir / bukti transfer.`;
+      // G. Maksud Lain / Tidak Dikenali
+      const helpMsg = `Saya belum memahami pesan tersebut.\n\nContoh yang bisa kamu ketik:\n• "cek dompet dong" (tanya saldo dompet tertentu)\n• "di dana ada 600 perak" (atur saldo dompet)\n• "tadi sore jajan geprek 18rb" (catat pengeluaran)\n• "bukan bca, tapi tunai" (ralat transaksi terakhir)\n• "batalkan transaksi tadi" (hapus transaksi terakhir)\natau kirim foto struk kasir / bukti transfer.`;
       await sendTelegramMessage(chatId, helpMsg);
       return new Response("OK", { status: 200 });
     }
