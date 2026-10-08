@@ -133,8 +133,24 @@ export function TransactionModal({
       <div className="modal-sheet" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h2 className="modal-title">Catat Transaksi</h2>
-          <button type="button" onClick={onClose} className="btn btn-secondary" style={{ minHeight: '32px', padding: '4px 10px' }}>
-            Tutup
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-secondary"
+            style={{
+              minHeight: '34px',
+              width: '34px',
+              padding: 0,
+              borderRadius: '50%',
+              fontSize: '15px',
+              lineHeight: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            aria-label="Tutup"
+          >
+            ✕
           </button>
         </div>
 

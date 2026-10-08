@@ -38,12 +38,35 @@ export function Login({ onSignIn, onSignUp }: LoginProps) {
 
   return (
     <div className="content-area" style={{ justifyContent: 'center', minHeight: '80vh' }}>
-      <div className="card" style={{ maxWidth: '400px', margin: '0 auto', width: '100%' }}>
-        <h2 style={{ fontSize: '18px', fontWeight: 600, marginBottom: '6px' }}>
+      <div className="card" style={{ maxWidth: '400px', margin: '0 auto', width: '100%', padding: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+          <div style={{
+            width: '42px',
+            height: '42px',
+            borderRadius: '12px',
+            background: 'linear-gradient(135deg, #2563eb, #1d4ed8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 14px rgba(37, 99, 235, 0.35)'
+          }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+              <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+              <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '16px', letterSpacing: '-0.02em' }}>Keuangan Pribadi</div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Pencatat keuangan & anggaran</div>
+          </div>
+        </div>
+
+        <h2 style={{ fontSize: '18px', fontWeight: 700, marginBottom: '6px', letterSpacing: '-0.02em' }}>
           {isRegisterMode ? 'Buat Akun Pertama' : 'Masuk Akun'}
         </h2>
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-          Pencatatan keuangan pribadi satu pengguna.
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '18px' }}>
+          Akses dompet, anggaran, dan riwayat transaksi aman.
         </p>
 
         {error && (

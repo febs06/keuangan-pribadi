@@ -1,7 +1,7 @@
 :root {
-  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-family: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   
-  /* Palet tenang: aksen biru netral, latar terang bersih */
+  /* Palet Modern Minimalis Elegan (Light Mode) */
   --bg-app: #f8fafc;
   --bg-surface: #ffffff;
   --bg-subtle: #f1f5f9;
@@ -12,13 +12,28 @@
   --text-dim: #94a3b8;
   
   --border-color: #e2e8f0;
-  --border-focus: #475569;
+  --border-focus: #2563eb;
   
   --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-subtle: rgba(37, 99, 235, 0.08);
   --accent-text: #ffffff;
   
   --income: #059669;
+  --income-bg: rgba(5, 150, 105, 0.09);
   --expense: #dc2626;
+  --expense-bg: rgba(220, 38, 38, 0.09);
+  
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.06), 0 2px 6px -1px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.08), 0 4px 8px -2px rgba(0, 0, 0, 0.04);
+  --shadow-glow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-full: 9999px;
   
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
@@ -26,23 +41,34 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-app: #0b0f17;
-    --bg-surface: #131b26;
+    /* Palet Modern Minimalis Elegan (Dark Mode) */
+    --bg-app: #090d16;
+    --bg-surface: #111827;
     --bg-subtle: #1e293b;
     --bg-muted: #334155;
     
-    --text-main: #f1f5f9;
+    --text-main: #f8fafc;
     --text-muted: #94a3b8;
     --text-dim: #64748b;
     
-    --border-color: #243042;
-    --border-focus: #94a3b8;
+    --border-color: #1e293b;
+    --border-focus: #3b82f6;
     
     --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --accent-subtle: rgba(59, 130, 246, 0.15);
     --accent-text: #ffffff;
     
     --income: #10b981;
-    --expense: #ef4444;
+    --income-bg: rgba(16, 185, 129, 0.15);
+    --expense: #f43f5e;
+    --expense-bg: rgba(244, 63, 94, 0.15);
+    
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-sm: 0 2px 5px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.45);
+    --shadow-lg: 0 14px 30px rgba(0, 0, 0, 0.55);
+    --shadow-glow: 0 0 0 3px rgba(59, 130, 246, 0.25);
   }
 }
 
@@ -62,6 +88,8 @@ body {
   overflow-x: hidden;
   width: 100%;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #root {
@@ -73,6 +101,7 @@ body {
   margin: 0 auto;
   position: relative;
   background-color: var(--bg-surface);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.03);
 }
 
 /* Navigasi Atas */
@@ -80,44 +109,56 @@ body {
   position: sticky;
   top: 0;
   z-index: 20;
-  background-color: var(--bg-surface);
+  background-color: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid var(--border-color);
-  padding: calc(12px + var(--safe-top)) 16px 12px 16px;
+  padding: calc(14px + var(--safe-top)) 18px 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  transition: border-color 0.2s ease;
+}
+
+@media (prefers-color-scheme: dark) {
+  .topbar {
+    background-color: rgba(17, 24, 39, 0.88);
+  }
 }
 
 .topbar-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .topbar-brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .brand-dot {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
   display: inline-block;
 }
 
 .topbar-title {
   font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
 }
 
 .topbar-back-btn {
   min-height: 32px;
-  padding: 2px 10px;
-  font-size: 12px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  border-radius: var(--radius-sm);
 }
 
 /* Desktop nav & actions (disembunyikan di HP) */
@@ -129,18 +170,30 @@ body {
 /* Area Konten Utama */
 .content-area {
   flex: 1;
-  padding: 16px 16px calc(76px + var(--safe-bottom)) 16px;
+  padding: 18px 18px calc(80px + var(--safe-bottom)) 18px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   width: 100%;
+  animation: pageEnter 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes pageEnter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* Grid Layout Responsif Default (Mobile) */
 .desktop-stat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -162,7 +215,7 @@ body {
 .more-menu-grid {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -187,31 +240,38 @@ body {
     background-color: transparent;
     border-left: none;
     border-right: none;
+    box-shadow: none;
   }
 
   .topbar {
-    padding: 14px 28px;
-    background-color: var(--bg-surface);
-    border-radius: 0 0 12px 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    padding: 16px 32px;
+    background-color: rgba(255, 255, 255, 0.92);
+    border-radius: 0 0 16px 16px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .topbar {
+      background-color: rgba(17, 24, 39, 0.92);
+    }
   }
 
   .desktop-nav {
     display: flex !important;
-    gap: 6px;
+    gap: 8px;
     align-items: center;
   }
 
   .desktop-nav-link {
     background: transparent;
     border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
     font-size: 14px;
     font-weight: 500;
     color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   .desktop-nav-link:hover {
@@ -220,7 +280,7 @@ body {
   }
 
   .desktop-nav-link.active {
-    background-color: var(--bg-subtle);
+    background-color: var(--accent-subtle);
     color: var(--accent);
     font-weight: 600;
   }
@@ -245,15 +305,15 @@ body {
   /* 2 Kolom Utama di PC */
   .desktop-main-grid {
     display: grid !important;
-    grid-template-columns: 380px 1fr !important;
-    gap: 22px !important;
+    grid-template-columns: 390px 1fr !important;
+    gap: 24px !important;
     align-items: start !important;
   }
 
   .grid-responsive {
     display: grid !important;
     grid-template-columns: 1fr 1fr !important;
-    gap: 22px !important;
+    gap: 24px !important;
     align-items: start !important;
   }
 
@@ -261,7 +321,7 @@ body {
   .more-menu-grid {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
-    gap: 16px !important;
+    gap: 18px !important;
   }
 
   /* Sembunyikan Bilah Navigasi Bawah & Tombol Melayang HP di Layar PC */
@@ -281,26 +341,27 @@ body {
 /* Filter Pill Group */
 .filter-pill-group {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
 
 .filter-pill {
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: var(--radius-full);
   font-size: 13px;
   font-weight: 500;
   border: 1px solid var(--border-color);
   background: var(--bg-surface);
   color: var(--text-muted);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .filter-pill:hover {
   background: var(--bg-subtle);
   color: var(--text-main);
+  border-color: var(--border-focus);
 }
 
 .filter-pill.active {
@@ -308,6 +369,7 @@ body {
   color: var(--accent-text);
   border-color: var(--accent);
   font-weight: 600;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 /* Navigasi Bawah (Hanya untuk Layar Ponsel) */
@@ -319,21 +381,30 @@ body {
   width: 100%;
   max-width: 500px;
   z-index: 30;
-  background-color: var(--bg-surface);
+  background-color: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: space-around;
   padding-bottom: var(--safe-bottom);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  .bottom-nav {
+    background-color: rgba(17, 24, 39, 0.9);
+  }
 }
 
 .nav-item {
   flex: 1;
-  height: 58px;
+  height: 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 3px;
+  gap: 4px;
   background: none;
   border: none;
   color: var(--text-muted);
@@ -342,7 +413,11 @@ body {
   cursor: pointer;
   text-decoration: none;
   user-select: none;
-  transition: color 0.15s ease;
+  transition: color 0.18s ease, transform 0.18s ease;
+}
+
+.nav-item:active {
+  transform: scale(0.92);
 }
 
 .nav-item.active {
@@ -351,44 +426,61 @@ body {
 }
 
 .nav-item svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
+  transition: transform 0.18s ease;
+}
+
+.nav-item.active svg {
+  transform: translateY(-1px);
 }
 
 /* Tombol Floating Tambah Cepat */
 .floating-fab {
   position: fixed;
-  bottom: calc(70px + var(--safe-bottom));
+  bottom: calc(74px + var(--safe-bottom));
   right: 20px;
   z-index: 25;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  background-color: var(--accent);
+  width: 54px;
+  height: 54px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: var(--accent-text);
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 24px -2px rgba(37, 99, 235, 0.45);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.floating-fab:hover {
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 12px 28px -2px rgba(37, 99, 235, 0.55);
+}
+
+.floating-fab:active {
+  transform: scale(0.94);
 }
 
 /* Kotak / Kartu Bersih */
 .card {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 18px;
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .card-title {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 12px;
+  letter-spacing: 0.05em;
+  margin-bottom: 14px;
 }
 
 .card-header-row {
@@ -406,74 +498,97 @@ body {
   font-weight: 600;
   cursor: pointer;
   padding: 0;
+  transition: opacity 0.15s ease;
+}
+
+.link-btn:hover {
+  opacity: 0.8;
+  text-decoration: underline;
 }
 
 /* Komponen Kartu Statistik Metrik */
 .stat-card {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
 }
 
 .stat-label {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
 .stat-value {
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   font-variant-numeric: tabular-nums;
+  line-height: 1.25;
 }
 
 .stat-sub {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-dim);
 }
 
 /* Kartu Peringatan Tagihan */
 .bill-alert-card {
   border-left: 4px solid var(--accent);
-  background: linear-gradient(to right, var(--bg-subtle), var(--bg-surface));
+  background: linear-gradient(135deg, var(--bg-subtle), var(--bg-surface));
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.bill-alert-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
 
 .bill-tag {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent);
   text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* Dompet Visual List */
 .wallet-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .wallet-card-item {
-  padding: 12px;
-  border-radius: 8px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
   background-color: var(--bg-subtle);
+  border: 1px solid var(--border-color);
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.wallet-card-item:hover {
+  border-color: var(--border-focus);
 }
 
 .wallet-bar-track {
   width: 100%;
-  height: 5px;
+  height: 6px;
   background-color: var(--bg-muted);
-  border-radius: 3px;
-  margin-bottom: 4px;
+  border-radius: var(--radius-full);
+  margin-bottom: 6px;
   overflow: hidden;
 }
 
 .wallet-bar-fill {
   height: 100%;
-  background-color: var(--accent);
-  border-radius: 3px;
+  background: linear-gradient(90deg, var(--accent), #60a5fa);
+  border-radius: var(--radius-full);
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* Daftar Transaksi Bersih */
@@ -486,8 +601,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: 13px 8px;
   border-bottom: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s ease;
+}
+
+.tx-row:hover {
+  background-color: var(--bg-subtle);
 }
 
 .tx-row:last-child {
@@ -495,27 +616,31 @@ body {
 }
 
 .tx-type-badge {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 700;
-  padding: 3px 7px;
-  border-radius: 5px;
+  padding: 3px 8px;
+  border-radius: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
 }
 
 .badge-inc {
-  background-color: rgba(5, 150, 105, 0.12);
+  background-color: var(--income-bg);
   color: var(--income);
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .badge-exp {
-  background-color: rgba(220, 38, 38, 0.12);
+  background-color: var(--expense-bg);
   color: var(--expense);
+  border: 1px solid rgba(239, 68, 68, 0.2);
 }
 
 .badge-trf {
   background-color: var(--bg-subtle);
   color: var(--text-muted);
+  border: 1px solid var(--border-color);
 }
 
 /* Bar Filter Transaksi */
@@ -524,12 +649,12 @@ body {
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 12px;
 }
 
 .filter-controls {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -538,31 +663,39 @@ body {
 .menu-card {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
-  padding: 16px 18px;
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
   text-align: left;
   width: 100%;
-  transition: all 0.15s ease;
+  box-shadow: var(--shadow-xs);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .menu-card:hover {
   background-color: var(--bg-subtle);
   border-color: var(--border-focus);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.menu-card:active {
+  transform: scale(0.98);
 }
 
 .menu-card-title {
   font-size: 15px;
   font-weight: 600;
   color: var(--text-main);
-  margin-bottom: 2px;
+  margin-bottom: 3px;
+  letter-spacing: -0.01em;
 }
 
 .menu-card-desc {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 
@@ -570,7 +703,8 @@ body {
 .amount-text {
   font-variant-numeric: tabular-nums;
   text-align: right;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .amount-income {
@@ -590,46 +724,52 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .form-label {
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
   color: var(--text-muted);
+  letter-spacing: -0.01em;
 }
 
 .form-input, .form-select, .form-textarea {
   width: 100%;
-  min-height: 44px;
+  min-height: 46px;
   padding: 10px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  border: 1.5px solid var(--border-color);
   background-color: var(--bg-surface);
   color: var(--text-main);
   font-family: inherit;
-  font-size: 15px;
+  font-size: 14.5px;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .form-input:focus, .form-select:focus, .form-textarea:focus {
   outline: none;
-  border-color: var(--border-focus);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-glow);
 }
 
 .form-input-amount {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
   text-align: right;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-main);
 }
 
 /* Tombol */
 .btn {
   min-height: 44px;
-  padding: 10px 16px;
-  border-radius: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   cursor: pointer;
   border: 1px solid transparent;
   display: inline-flex;
@@ -637,11 +777,23 @@ body {
   justify-content: center;
   gap: 8px;
   user-select: none;
+  font-family: inherit;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn:active {
+  transform: scale(0.97);
 }
 
 .btn-primary {
-  background-color: var(--accent);
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: var(--accent-text);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  filter: brightness(1.04);
 }
 
 .btn-secondary {
@@ -650,10 +802,18 @@ body {
   border-color: var(--border-color);
 }
 
+.btn-secondary:hover {
+  background-color: var(--bg-muted);
+}
+
 .btn-danger {
-  background-color: transparent;
+  background-color: var(--expense-bg);
   color: var(--expense);
-  border-color: var(--border-color);
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.btn-danger:hover {
+  background-color: rgba(220, 38, 38, 0.16);
 }
 
 .btn-full {
@@ -664,21 +824,51 @@ body {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   z-index: 50;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+  animation: fadeInBackdrop 0.2s ease;
+}
+
+@keyframes fadeInBackdrop {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .modal-sheet {
   background-color: var(--bg-surface);
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-  padding: 20px 20px calc(24px + var(--safe-bottom)) 20px;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  padding: 12px 20px calc(24px + var(--safe-bottom)) 20px;
   max-height: 90vh;
   overflow-y: auto;
   border-top: 1px solid var(--border-color);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
+  animation: modalSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+
+.modal-sheet::before {
+  content: "";
+  display: block;
+  width: 38px;
+  height: 4px;
+  border-radius: 2px;
+  background-color: var(--border-color);
+  margin: 4px auto 14px auto;
+}
+
+@keyframes modalSlideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
 }
 
 @media (min-width: 768px) {
@@ -688,10 +878,28 @@ body {
   }
 
   .modal-sheet {
-    border-radius: 16px;
+    border-radius: 20px;
     width: 100%;
-    max-width: 480px;
+    max-width: 500px;
     max-height: 85vh;
+    animation: modalPopIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: var(--shadow-lg);
+    border: 1px solid var(--border-color);
+  }
+
+  .modal-sheet::before {
+    display: none;
+  }
+
+  @keyframes modalPopIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 }
 
@@ -703,17 +911,19 @@ body {
 }
 
 .modal-title {
-  font-size: 17px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 /* Segment Control */
 .segment-control {
   display: flex;
   background-color: var(--bg-subtle);
-  border-radius: 8px;
-  padding: 3px;
-  margin-bottom: 16px;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border-color);
 }
 
 .segment-btn {
@@ -721,17 +931,20 @@ body {
   min-height: 38px;
   border: none;
   background: none;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 9px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .segment-btn.active {
   background-color: var(--bg-surface);
   color: var(--text-main);
   font-weight: 600;
+  box-shadow: var(--shadow-xs);
 }
 
 /* Category Chips */
@@ -739,26 +952,35 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .chip-btn {
   min-height: 44px;
-  border: 1px solid var(--border-color);
+  border: 1.5px solid var(--border-color);
   background-color: var(--bg-surface);
   color: var(--text-main);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 10px;
+  padding: 8px 10px;
   font-size: 13px;
   cursor: pointer;
   text-align: center;
   word-break: break-word;
+  font-family: inherit;
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.chip-btn:hover {
+  background-color: var(--bg-subtle);
+  border-color: var(--border-focus);
 }
 
 .chip-btn.selected {
   border-color: var(--accent);
-  background-color: var(--bg-subtle);
-  font-weight: 600;
+  background-color: var(--accent-subtle);
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-glow);
 }
 
 /* Daftar Baris */
@@ -766,9 +988,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
+  padding: 12px 6px;
   border-bottom: 1px solid var(--border-color);
   min-height: 48px;
+  transition: background-color 0.15s ease;
+}
+
+.row-item:hover {
+  background-color: var(--bg-subtle);
+  border-radius: 6px;
 }
 
 .row-item:last-child {
@@ -777,9 +1005,10 @@ body {
 
 .badge {
   font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
   background-color: var(--bg-muted);
   color: var(--text-muted);
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }

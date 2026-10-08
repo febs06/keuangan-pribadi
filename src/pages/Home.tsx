@@ -31,25 +31,37 @@ export function Home({
       {/* 1. Baris Metrik Utama (4 Kartu di PC, 2 Kolom di Mobile) */}
       <div className="desktop-stat-grid">
         <div className="card stat-card">
-          <div className="stat-label">Total Saldo Aktif</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="stat-label">Total Saldo Aktif</div>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--accent)' }} />
+          </div>
           <div className="stat-value">{formatRupiah(totalBalance)}</div>
           <div className="stat-sub">{activeWallets.length} dompet aktif</div>
         </div>
 
         <div className="card stat-card">
-          <div className="stat-label">Pemasukan Hari Ini</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="stat-label">Pemasukan Hari Ini</div>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--income)' }} />
+          </div>
           <div className="stat-value amount-income">{formatRupiah(todaySummary.income)}</div>
           <div className="stat-sub">Arus kas masuk</div>
         </div>
 
         <div className="card stat-card">
-          <div className="stat-label">Pengeluaran Hari Ini</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="stat-label">Pengeluaran Hari Ini</div>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--expense)' }} />
+          </div>
           <div className="stat-value amount-expense">{formatRupiah(todaySummary.expense)}</div>
           <div className="stat-sub">Arus kas keluar</div>
         </div>
 
         <div className="card stat-card">
-          <div className="stat-label">Sisa Anggaran Bulan Ini</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="stat-label">Sisa Anggaran</div>
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: '#8b5cf6' }} />
+          </div>
           <div className={`stat-value ${hasBudget && totalBudgetRemaining < 0 ? 'amount-expense' : ''}`}>
             {hasBudget ? formatRupiah(totalBudgetRemaining) : 'Belum diatur'}
           </div>
