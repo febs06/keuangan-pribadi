@@ -106,11 +106,12 @@ function fallbackParseIndonesianText(text: string) {
     return { intent: "correct_transaction", new_wallet_name };
   }
 
-  // 3. Deteksi cek sisa anggaran / budget
+  // 3. Deteksi cek sisa anggaran / budget / jatah belanja
   if (
     /(cek|lihat|sisa|info|berapa).*(anggaran|budget|limit)/i.test(lower) ||
     /(anggaran|budget|limit).*(apa aja|berapa|sisa|daftar|habis)/i.test(lower) ||
-    /^(\/budget|\/anggaran|cek budget|cek anggaran|sisa budget|sisa anggaran)$/i.test(lower)
+    /(sisa\s+uang|jatah|dana).*(belanja|jajan|dibelanjakan)/i.test(lower) ||
+    /^(\/budget|\/anggaran|budget|anggaran|cek budget|cek anggaran|sisa budget|sisa anggaran)$/i.test(lower)
   ) {
     let category: string | null = null;
     if (/makan|jajan/i.test(lower)) category = "Makan/jajan";
@@ -328,7 +329,7 @@ Identifikasi maksud pengguna secara cerdas:
    - Jika orang lain yang berutang ke pengguna ("piutang X", "masukkan ke piutang X", "X ngutang ke aku", "talangin X") -> debt_type: "receivable"
 2. "check_debt": jika menanyakan daftar utang atau piutang (contoh: "cek utang", "ada utang apa aja", "cek piutang")
 3. "settle_debt": jika melunasi utang atau piutang (contoh: "lunasi utang ke dua carita", "budi sudah bayar utang", "utang ke budi lunas")
-4. "check_budget": jika menanyakan sisa atau status anggaran/budget (contoh: "cek budget", "sisa anggaran makan berapa", "budget bulan ini", "cek limit", "anggaran apa aja"). Jika spesifik ke kategori tertentu, sebutkan di category_or_source.
+4. "check_budget": jika menanyakan sisa atau status anggaran / budget / sisa uang yang boleh dibelanjakan (contoh: "cek budget", "budget", "sisa anggaran makan berapa", "sisa uang yang boleh dibelanjakan berapa lagi?", "budget bulan ini", "cek limit", "anggaran apa aja", "sisa anggaran"). Jika spesifik ke kategori tertentu, sebutkan di category_or_source.
 5. "set_balance": jika pengguna menginformasikan atau mengatur saldo dompet (contoh: "di dana ada 600 perak", "saldo bca ada 50rb"). Catatan: "perak" berarti rupiah (contoh: 600 perak = 600).
 6. "correct_transaction": jika pengguna ingin meralat/mengoreksi transaksi terakhir (contoh: "bukan pake bca, tapi pake uang tunai", "bukan bca tapi dana", "ralat tadi 20rb")
 7. "delete_transaction": jika membatalkan/menghapus transaksi terakhir (contoh: "batalkan transaksi tadi", "hapus transaksi barusan", "ga jadi catat")

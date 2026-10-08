@@ -49,11 +49,12 @@ function fallbackParseIndonesianText(text) {
     return { intent: "correct_transaction", new_wallet_name };
   }
 
-  // 3. Deteksi cek sisa anggaran / budget
+  // 3. Deteksi cek sisa anggaran / budget / jatah belanja
   if (
     /(cek|lihat|sisa|info|berapa).*(anggaran|budget|limit)/i.test(lower) ||
     /(anggaran|budget|limit).*(apa aja|berapa|sisa|daftar|habis)/i.test(lower) ||
-    /^(\/budget|\/anggaran|cek budget|cek anggaran|sisa budget|sisa anggaran)$/i.test(lower)
+    /(sisa\s+uang|jatah|dana).*(belanja|jajan|dibelanjakan)/i.test(lower) ||
+    /^(\/budget|\/anggaran|budget|anggaran|cek budget|cek anggaran|sisa budget|sisa anggaran)$/i.test(lower)
   ) {
     let category = null;
     if (/makan|jajan/i.test(lower)) category = "Makan/jajan";
@@ -154,6 +155,18 @@ test('Kondisi 1: Parsing Intent Cek Anggaran (check_budget)', async (t) => {
     const res = fallbackParseIndonesianText("sisa budget tagihan");
     assert.equal(res.intent, "check_budget");
     assert.equal(res.category_or_source, "Tagihan");
+  });
+
+  await t.test('1.7: Kata tunggal "budget" dan "sisa anggaran" valid', () => {
+    const res1 = fallbackParseIndonesianText("budget");
+    const res2 = fallbackParseIndonesianText("sisa anggaran");
+    assert.equal(res1.intent, "check_budget");
+    assert.equal(res2.intent, "check_budget");
+  });
+
+  await t.test('1.8: Kalimat "sisa uang yang boleh dibelanjakan berapa lagi?" mendeteksi check_budget', () => {
+    const res = fallbackParseIndonesianText("sisa uang yang boleh dibelanjakan berapa lagi?");
+    assert.equal(res.intent, "check_budget");
   });
 });
 
