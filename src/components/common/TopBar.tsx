@@ -31,7 +31,13 @@ export function TopBar({
         ) : null}
         <div className="topbar-brand">
           <span className="brand-dot" />
-          <span className="topbar-title">{title}</span>
+          <span className="topbar-title desktop-brand-title">
+            Keuangan Pribadi
+            {showBackButton ? <span style={{ opacity: 0.5, margin: '0 6px', fontWeight: 400 }}>/ {title}</span> : null}
+          </span>
+          <span className="topbar-title mobile-brand-title">
+            {title}
+          </span>
         </div>
       </div>
 

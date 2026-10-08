@@ -90,6 +90,10 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: var(--font-family);
   background-color: var(--bg-app);
@@ -112,6 +116,14 @@ body {
   margin: 0 auto;
   position: relative;
   background-color: var(--bg-app);
+}
+
+.desktop-brand-title {
+  display: none;
+}
+
+.mobile-brand-title {
+  display: inline-block;
 }
 
 /* Navigasi Atas (TopBar) - Architectural Precision */
@@ -253,17 +265,34 @@ body {
     background-color: transparent;
   }
 
+  .desktop-brand-title {
+    display: inline-block;
+  }
+
+  .mobile-brand-title {
+    display: none;
+  }
+
   .topbar {
+    display: grid !important;
+    grid-template-columns: 1fr auto 1fr !important;
+    align-items: center !important;
     padding: 16px 36px;
     border-radius: 0;
     border-left: none;
     border-right: none;
   }
 
+  .topbar-left {
+    justify-self: start;
+    min-width: 0;
+  }
+
   .desktop-nav {
     display: flex !important;
     gap: 4px;
     align-items: center;
+    justify-self: center;
   }
 
   .desktop-nav-link {
@@ -278,7 +307,7 @@ body {
     letter-spacing: 0.08em;
     color: var(--text-muted);
     cursor: pointer;
-    transition: all 0.16s ease;
+    transition: color 0.16s ease, border-color 0.16s ease;
   }
 
   .desktop-nav-link:hover {
@@ -288,8 +317,8 @@ body {
 
   .desktop-nav-link.active {
     color: var(--text-main);
-    border-bottom: 2px solid var(--accent);
-    font-weight: 600;
+    border-bottom-color: var(--accent);
+    font-weight: 500;
     background-color: transparent;
   }
 
@@ -297,6 +326,7 @@ body {
     display: flex !important;
     gap: 10px;
     align-items: center;
+    justify-self: end;
   }
 
   .content-area {
