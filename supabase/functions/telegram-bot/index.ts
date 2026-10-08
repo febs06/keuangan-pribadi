@@ -106,7 +106,22 @@ function fallbackParseIndonesianText(text: string) {
     return { intent: "correct_transaction", new_wallet_name };
   }
 
-  // 3. Deteksi cek daftar utang / piutang
+  // 3. Deteksi cek sisa anggaran / budget
+  if (
+    /(cek|lihat|sisa|info|berapa).*(anggaran|budget|limit)/i.test(lower) ||
+    /(anggaran|budget|limit).*(apa aja|berapa|sisa|daftar|habis)/i.test(lower) ||
+    /^(\/budget|\/anggaran|cek budget|cek anggaran|sisa budget|sisa anggaran)$/i.test(lower)
+  ) {
+    let category: string | null = null;
+    if (/makan|jajan/i.test(lower)) category = "Makan/jajan";
+    else if (/transport/i.test(lower)) category = "Transport";
+    else if (/kebutuhan|belanja/i.test(lower)) category = "Kebutuhan";
+    else if (/tagihan/i.test(lower)) category = "Tagihan";
+
+    return { intent: "check_budget", category_or_source: category };
+  }
+
+  // 4. Deteksi cek daftar utang / piutang
   if (
     /(cek|lihat|daftar|info|ada)\s*(utang|piutang|kasbon)/i.test(lower) ||
     /(utang|piutang|kasbon)\s*(apa aja|berapa|daftar)/i.test(lower) ||
@@ -313,13 +328,14 @@ Identifikasi maksud pengguna secara cerdas:
    - Jika orang lain yang berutang ke pengguna ("piutang X", "masukkan ke piutang X", "X ngutang ke aku", "talangin X") -> debt_type: "receivable"
 2. "check_debt": jika menanyakan daftar utang atau piutang (contoh: "cek utang", "ada utang apa aja", "cek piutang")
 3. "settle_debt": jika melunasi utang atau piutang (contoh: "lunasi utang ke dua carita", "budi sudah bayar utang", "utang ke budi lunas")
-4. "set_balance": jika pengguna menginformasikan atau mengatur saldo dompet (contoh: "di dana ada 600 perak", "saldo bca ada 50rb"). Catatan: "perak" berarti rupiah (contoh: 600 perak = 600).
-5. "correct_transaction": jika pengguna ingin meralat/mengoreksi transaksi terakhir (contoh: "bukan pake bca, tapi pake uang tunai", "bukan bca tapi dana", "ralat tadi 20rb")
-6. "delete_transaction": jika membatalkan/menghapus transaksi terakhir (contoh: "batalkan transaksi tadi", "hapus transaksi barusan", "ga jadi catat")
-7. "check_balance": jika menanyakan saldo/uang (contoh: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa")
-8. "record_transaction": jika mencatat pengeluaran/pemasukan baru (contoh: "jajan bakso 20rb", "nemu duit 2ribu")
-9. "greeting": jika menyapa (contoh: "halo", "hai")
-10. "other": lainnya
+4. "check_budget": jika menanyakan sisa atau status anggaran/budget (contoh: "cek budget", "sisa anggaran makan berapa", "budget bulan ini", "cek limit", "anggaran apa aja"). Jika spesifik ke kategori tertentu, sebutkan di category_or_source.
+5. "set_balance": jika pengguna menginformasikan atau mengatur saldo dompet (contoh: "di dana ada 600 perak", "saldo bca ada 50rb"). Catatan: "perak" berarti rupiah (contoh: 600 perak = 600).
+6. "correct_transaction": jika pengguna ingin meralat/mengoreksi transaksi terakhir (contoh: "bukan pake bca, tapi pake uang tunai", "bukan bca tapi dana", "ralat tadi 20rb")
+7. "delete_transaction": jika membatalkan/menghapus transaksi terakhir (contoh: "batalkan transaksi tadi", "hapus transaksi barusan", "ga jadi catat")
+8. "check_balance": jika menanyakan saldo/uang (contoh: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa")
+9. "record_transaction": jika mencatat pengeluaran/pemasukan baru (contoh: "jajan bakso 20rb", "nemu duit 2ribu")
+10. "greeting": jika menyapa (contoh: "halo", "hai")
+11. "other": lainnya
 
 Kembalikan format JSON murni:
 {
@@ -399,7 +415,7 @@ serve(async (req) => {
 
     // 1. Perintah Bantuan / Mulai
     if (text === "/start" || text === "/help") {
-      const welcome = `Halo Febri! Asisten Keuangan aktif 24 jam.\n\nKamu bisa bicara dengan bahasa santai:\n• Foto Struk: Kirim foto struk belanja / nota / transferan kasir langsung.\n• Utang / Piutang: "ngutang dulu ke dua carita 26364", "masukkan ke piutang budi 50rb", "cek utang"\n• Pelunasan Utang: "lunasi utang ke dua carita"\n• Catat Pengeluaran: "tadi sore jajan geprek 18rb", "bayar gacoan 26364 pake bca"\n• Catat Pemasukan: "nemu duit 2ribu di laci", "gaji 5jt bca"\n• Tanya Saldo: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa?"\n• Atur Saldo: "di dana ada 600 perak"\n• Ralat / Koreksi: "bukan pake bca, tapi pake uang tunai"\n• Batalkan: "batalkan transaksi tadi"`;
+      const welcome = `Halo Febri! Asisten Keuangan aktif 24 jam.\n\nKamu bisa bicara dengan bahasa santai:\n• Foto Struk: Kirim foto struk belanja / nota / transferan kasir langsung.\n• Utang / Piutang: "ngutang dulu ke dua carita 26364", "masukkan ke piutang budi 50rb", "cek utang"\n• Pelunasan Utang: "lunasi utang ke dua carita"\n• Cek Anggaran: "cek budget", "sisa anggaran makan berapa?"\n• Catat Pengeluaran: "tadi sore jajan geprek 18rb", "bayar gacoan 26364 pake bca"\n• Catat Pemasukan: "nemu duit 2ribu di laci", "gaji 5jt bca"\n• Tanya Saldo: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa?"\n• Atur Saldo: "di dana ada 600 perak"\n• Ralat / Koreksi: "bukan pake bca, tapi pake uang tunai"\n• Batalkan: "batalkan transaksi tadi"`;
       await sendTelegramMessage(chatId, welcome);
       return new Response("OK", { status: 200 });
     }
@@ -528,6 +544,21 @@ serve(async (req) => {
           await sendTelegramMessage(chatId, "Gagal mengambil data utang: " + (debtError?.message || debtData?.error));
         } else {
           await sendTelegramMessage(chatId, debtData.reply_message);
+        }
+        return new Response("OK", { status: 200 });
+      }
+
+      // B2. Maksud: Cek Anggaran / Sisa Budget Bulanan
+      if (parsedData.intent === "check_budget") {
+        const { data: budgetData, error: budgetError } = await supabase.rpc("get_bot_budget_summary", {
+          p_chat_id: chatId,
+          p_category_name: parsedData.category_or_source || null,
+        });
+
+        if (budgetError || !budgetData?.success) {
+          await sendTelegramMessage(chatId, "Gagal mengambil data anggaran: " + (budgetError?.message || budgetData?.error));
+        } else {
+          await sendTelegramMessage(chatId, budgetData.reply_message);
         }
         return new Response("OK", { status: 200 });
       }
@@ -672,7 +703,7 @@ serve(async (req) => {
       }
 
       // J. Maksud Lain / Tidak Dikenali
-      const helpMsg = `Saya belum memahami pesan tersebut.\n\nContoh yang bisa kamu ketik:\n• "ngutang dulu ke dua carita 26364" (catat utang)\n• "masukkan ke piutang budi 50rb" (catat piutang)\n• "cek utang" (daftar utang & piutang)\n• "tadi sore jajan geprek 18rb" (catat pengeluaran)\n• "cek dompet dong" (tanya saldo dompet)\natau kirim foto struk kasir / bukti pembayaran.`;
+      const helpMsg = `Saya belum memahami pesan tersebut.\n\nContoh yang bisa kamu ketik:\n• "cek budget" atau "sisa anggaran makan berapa"\n• "ngutang dulu ke dua carita 26364" (catat utang)\n• "masukkan ke piutang budi 50rb" (catat piutang)\n• "cek utang" (daftar utang & piutang)\n• "tadi sore jajan geprek 18rb" (catat pengeluaran)\n• "cek dompet dong" (tanya saldo dompet)\natau kirim foto struk kasir / bukti pembayaran.`;
       await sendTelegramMessage(chatId, helpMsg);
       return new Response("OK", { status: 200 });
     }
