@@ -36,7 +36,8 @@ export function useTransactions() {
       let exp = 0;
 
       for (const t of txs) {
-        if (t.date === today) {
+        const tDate = (t.date || '').split('T')[0].trim();
+        if (tDate === today) {
           if (t.type === 'income') {
             inc += Number(t.amount);
           } else if (t.type === 'expense') {

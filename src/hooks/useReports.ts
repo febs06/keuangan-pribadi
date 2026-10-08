@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { MonthlySummary, CategoryExpenseSummary, IncomeSourceSummary, Transaction } from '../types';
+import { getTodayDateString } from '../lib/format';
 
 export function useReports() {
   const [monthlySummaries, setMonthlySummaries] = useState<MonthlySummary[]>([]);
@@ -120,7 +121,7 @@ export function useReports() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `transaksi_keuangan_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute('download', `transaksi_keuangan_${getTodayDateString()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -29,12 +29,31 @@ export function formatDateIndo(dateStr: string): string {
   return `${day} ${months[month - 1]} ${year}`;
 }
 
-export function getTodayDateString(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+/**
+ * Mengembalikan string YYYY-MM-DD berdasarkan waktu lokal perangkat (WIB / zona lokal).
+ * Menghindari bug pergeseran tanggal akibat UTC di toISOString().
+ */
+export function getLocalDateKey(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Menambah atau mengurangi hari dari string YYYY-MM-DD dengan kalkulasi tanggal lokal murni.
+ */
+export function addDaysToDateKey(dateKey: string, days: number): string {
+  if (!dateKey) return '';
+  const clean = dateKey.split('T')[0].trim();
+  const [year, month, day] = clean.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  date.setDate(date.getDate() + days);
+  return getLocalDateKey(date);
+}
+
+export function getTodayDateString(): string {
+  return getLocalDateKey(new Date());
 }
 
 export function formatNumberInput(rawStr: string): string {

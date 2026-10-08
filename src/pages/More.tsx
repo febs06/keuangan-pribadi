@@ -375,7 +375,7 @@ export function More({
             <div>
               <div style={{ fontWeight: 600, fontSize: '14.5px' }}>Sesi Pengguna</div>
               <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
-                Terkoneksi aman dengan enkripsi RLS database Supabase.
+                Masuk sebagai pengguna pribadi. Data tersimpan aman di database.
               </div>
             </div>
             <button

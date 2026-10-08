@@ -68,7 +68,7 @@ export function Home({
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px', color: 'var(--text-dim)' }}>
             <span>{activeWallets.length} rekening aktif terhubung</span>
             <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--income)' }}>
-              <ShieldCheck size={14} /> Terenkripsi RLS
+              <ShieldCheck size={14} /> Data tersinkron
             </span>
           </div>
         </div>

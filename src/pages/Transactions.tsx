@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { Transaction, WalletWithBalance } from '../types';
-import { formatRupiah, formatDateIndo, getTodayDateString } from '../lib/format';
+import { formatRupiah, formatDateIndo, getTodayDateString, addDaysToDateKey } from '../lib/format';
 import { getCategoryStyle } from '../lib/categoryIcons';
 import { useToast } from '../components/common/Toast';
 import { Search, Trash2, Plus } from 'lucide-react';
@@ -59,20 +59,20 @@ export function Transactions({
     });
   }, [transactions, selectedWalletFilter, selectedTypeFilter, searchQuery]);
 
-  // Kelompokkan transaksi berdasarkan tanggal
+  // Kelompokkan transaksi berdasarkan tanggal (WIB / tanggal lokal perangkat)
   const groupedTransactions = useMemo(() => {
     const today = getTodayDateString();
-    const yesterdayDate = new Date();
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+    const yesterdayStr = addDaysToDateKey(today, -1);
 
     const groups: { [date: string]: Transaction[] } = {};
 
     for (const tx of filteredTransactions) {
-      if (!groups[tx.date]) {
-        groups[tx.date] = [];
+      const dateKey = (tx.date || '').split('T')[0].trim();
+      if (!dateKey) continue;
+      if (!groups[dateKey]) {
+        groups[dateKey] = [];
       }
-      groups[tx.date].push(tx);
+      groups[dateKey].push(tx);
     }
 
     return Object.keys(groups)
@@ -243,12 +243,19 @@ export function Transactions({
                   <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-muted)' }}>
                     {group.label}
                   </span>
-                  <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', display: 'flex', gap: '8px' }}>
+                  <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     {group.dayExpense > 0 && (
-                      <span className="amount-expense">- {formatRupiah(group.dayExpense)}</span>
+                      <span className="amount-expense" style={{ fontWeight: 500 }}>
+                        Keluar {formatRupiah(group.dayExpense)}
+                      </span>
+                    )}
+                    {group.dayExpense > 0 && group.dayIncome > 0 && (
+                      <span style={{ color: 'var(--text-dim)' }}>·</span>
                     )}
                     {group.dayIncome > 0 && (
-                      <span className="amount-income">+ {formatRupiah(group.dayIncome)}</span>
+                      <span className="amount-income" style={{ fontWeight: 500 }}>
+                        Masuk {formatRupiah(group.dayIncome)}
+                      </span>
                     )}
                   </div>
                 </div>

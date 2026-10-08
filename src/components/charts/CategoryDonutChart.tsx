@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { CategoryExpenseSummary } from '../../types';
-import { formatShortRupiah } from '../../lib/format';
+import { formatRupiah, formatShortRupiah } from '../../lib/format';
 import { getCategoryStyle } from '../../lib/categoryIcons';
 
 interface CategoryDonutChartProps {
@@ -132,43 +132,79 @@ export function CategoryDonutChart({ expenses }: CategoryDonutChartProps) {
         </div>
       </div>
 
-      {/* Legenda Kategori */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px 16px', width: '100%', maxWidth: '380px' }}>
-        {slices.map(slice => (
-          <div
-            key={slice.name}
-            onMouseEnter={() => setHoveredIdx(slice.idx)}
-            onMouseLeave={() => setHoveredIdx(null)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '4px 8px',
-              borderRadius: '6px',
-              backgroundColor: hoveredIdx === slice.idx ? 'var(--bg-subtle)' : 'transparent',
-              cursor: 'pointer',
-              transition: 'background-color 0.15s ease'
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-              <span
+      {/* Legenda Kategori Rapi di Bawah Donut (Satu Baris per Kategori) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%', maxWidth: '380px', marginTop: '6px' }}>
+        {slices.map(slice => {
+          const isHovered = hoveredIdx === slice.idx;
+          return (
+            <div
+              key={slice.name}
+              onMouseEnter={() => setHoveredIdx(slice.idx)}
+              onMouseLeave={() => setHoveredIdx(null)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '6px 10px',
+                borderRadius: '8px',
+                backgroundColor: isHovered ? 'var(--bg-subtle)' : 'transparent',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s ease'
+              }}
+            >
+              {/* Sisi Kiri: Titik Warna + Nama Kategori */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, marginRight: '12px' }}>
+                <span
+                  style={{
+                    width: '10px',
+                    height: '10px',
+                    borderRadius: '50%',
+                    backgroundColor: slice.color,
+                    flexShrink: 0
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: '12.5px',
+                    fontWeight: 500,
+                    color: 'var(--text-main)',
+                    textOverflow: 'ellipsis',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  {slice.name}
+                </span>
+              </div>
+
+              {/* Sisi Kanan: Nominal & Persentase (Rata Kanan, Tabular Nums) */}
+              <div
                 style={{
-                  width: '9px',
-                  height: '9px',
-                  borderRadius: '50%',
-                  backgroundColor: slice.color,
-                  flexShrink: 0
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  flexShrink: 0,
+                  fontVariantNumeric: 'tabular-nums',
+                  fontSize: '12.5px'
                 }}
-              />
-              <span style={{ fontSize: '12px', color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                {slice.name}
-              </span>
+              >
+                <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>
+                  {formatRupiah(slice.amount)}
+                </span>
+                <span
+                  style={{
+                    minWidth: '36px',
+                    textAlign: 'right',
+                    fontWeight: 700,
+                    color: slice.color
+                  }}
+                >
+                  {slice.percent}%
+                </span>
+              </div>
             </div>
-            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', marginLeft: '6px' }}>
-              {slice.percent}%
-            </span>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

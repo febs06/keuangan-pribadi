@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { ExpenseCategory } from '../types';
 import { useBudgets } from '../hooks/useBudgets';
 import { formatRupiah, formatNumberInput } from '../lib/format';
 import { useToast } from '../components/common/Toast';
 import { getCategoryStyle } from '../lib/categoryIcons';
+import { Trash2 } from 'lucide-react';
 
 interface BudgetsProps {
   categories: ExpenseCategory[];
@@ -27,11 +28,21 @@ export function Budgets({ categories }: BudgetsProps) {
   const [selectedCatId, setSelectedCatId] = useState('');
   const [limitStr, setLimitStr] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<string>>(new Set());
+  const deleteTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  // Bersihkan timer pending saat komponen unmount
+  useEffect(() => {
+    const timers = deleteTimersRef.current;
+    return () => {
+      timers.forEach(timer => clearTimeout(timer));
+    };
+  }, []);
 
   // Kategori aktif yang belum punya anggaran
   const activeCategories = categories.filter(c => !c.is_archived);
 
-  // Sisa hari di bulan ini untuk kalkulasi belanja aman harian
+  // Sisa hari di bulan ini untuk kalkulasi belanja aman harian (lokal perangkat)
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
   const currentDay = now.getDate();
@@ -57,20 +68,54 @@ export function Budgets({ categories }: BudgetsProps) {
     }
   };
 
-  const handleDeleteBudget = async (id: string, catId: string, limit: number, name: string) => {
-    await deleteBudget(id);
+  const handleDeleteBudget = (b: { id: string; category?: { name: string } | null }) => {
+    const budgetId = b.id;
+    const catName = b.category?.name || 'Kategori';
+
+    // Optimistik: langsung sembunyikan dari daftar
+    setPendingDeleteIds(prev => new Set(prev).add(budgetId));
+
+    // Tunda eksekusi hapus di database 4.5 detik untuk memberi jeda Undo
+    const timer = setTimeout(async () => {
+      deleteTimersRef.current.delete(budgetId);
+      try {
+        await deleteBudget(budgetId);
+      } catch (err) {
+        console.error('Gagal menghapus batas anggaran:', err);
+      } finally {
+        setPendingDeleteIds(prev => {
+          const next = new Set(prev);
+          next.delete(budgetId);
+          return next;
+        });
+      }
+    }, 4500);
+
+    deleteTimersRef.current.set(budgetId, timer);
+
     showToast({
-      message: `Batas anggaran "${name}" dihapus`,
+      message: `Batas anggaran "${catName}" dihapus`,
       type: 'info',
       action: {
         label: 'Batalkan',
-        onClick: async () => {
-          await setCategoryBudget(catId, limit);
-          showToast({ message: 'Batas anggaran dipulihkan', type: 'success' });
+        onClick: () => {
+          const activeTimer = deleteTimersRef.current.get(budgetId);
+          if (activeTimer) {
+            clearTimeout(activeTimer);
+            deleteTimersRef.current.delete(budgetId);
+          }
+          setPendingDeleteIds(prev => {
+            const next = new Set(prev);
+            next.delete(budgetId);
+            return next;
+          });
+          showToast({ message: `Batas anggaran "${catName}" dipulihkan`, type: 'success' });
         }
       }
     });
   };
+
+  const visibleBudgets = budgets.filter(b => !pendingDeleteIds.has(b.id));
 
   const totalPercent = totalLimit > 0 ? Math.round((totalSpent / totalLimit) * 100) : 0;
   const clampedTotalPercent = Math.min(totalPercent, 100);
@@ -232,7 +277,7 @@ export function Budgets({ categories }: BudgetsProps) {
           <div className="card">
             <div className="card-header-row">
               <span className="card-title" style={{ marginBottom: 0 }}>
-                Daftar Anggaran Kategori ({budgets.length})
+                Daftar Anggaran Kategori ({visibleBudgets.length})
               </span>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
                 Bulan berjalan
@@ -241,7 +286,7 @@ export function Budgets({ categories }: BudgetsProps) {
 
             {loading ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '16px 0' }}>Memuat data anggaran...</div>
-            ) : budgets.length === 0 ? (
+            ) : visibleBudgets.length === 0 ? (
               <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '24px 0', textAlign: 'center' }}>
                 <p style={{ marginBottom: '8px' }}>Belum ada anggaran yang diatur untuk bulan ini.</p>
                 <p style={{ fontSize: '12px', color: 'var(--text-dim)' }}>
@@ -250,7 +295,7 @@ export function Budgets({ categories }: BudgetsProps) {
               </div>
             ) : (
               <div>
-                {budgets.map(b => {
+                {visibleBudgets.map(b => {
                   const spent = expenses.find(e => e.category_id === b.category_id)?.total_expense || 0;
                   const limit = Number(b.limit_amount);
                   const remaining = limit - spent;
@@ -294,12 +339,19 @@ export function Budgets({ categories }: BudgetsProps) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <button
                             type="button"
-                            onClick={() => handleDeleteBudget(b.id, b.category_id, limit, b.category?.name || '')}
-                            className="btn btn-danger"
-                            style={{ minHeight: '28px', padding: '2px 8px', fontSize: '11px' }}
-                            aria-label={`Hapus batas anggaran ${b.category?.name}`}
+                            onClick={() => handleDeleteBudget(b)}
+                            className="btn btn-secondary"
+                            style={{
+                              minHeight: '32px',
+                              width: '32px',
+                              padding: 0,
+                              borderRadius: '8px',
+                              color: 'var(--text-muted)'
+                            }}
+                            title="Hapus batas anggaran"
+                            aria-label={`Hapus batas anggaran ${b.category?.name || 'Kategori'}`}
                           >
-                            Hapus
+                            <Trash2 size={15} />
                           </button>
                         </div>
                       </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Bill, BillPayment } from '../types';
-import { getTodayDateString } from '../lib/format';
+import { getTodayDateString, addDaysToDateKey } from '../lib/format';
 
 export function useBills() {
   const [bills, setBills] = useState<Bill[]>([]);
@@ -42,9 +42,7 @@ export function useBills() {
 
   // Tagihan yang terdekat (jatuh tempo dalam 7 hari) untuk Beranda
   const todayStr = getTodayDateString();
-  const todayDate = new Date();
-  const next7DaysDate = new Date(todayDate.getTime() + 7 * 24 * 60 * 60 * 1000);
-  const next7DaysStr = next7DaysDate.toISOString().split('T')[0];
+  const next7DaysStr = addDaysToDateKey(todayStr, 7);
 
   const nearestBill = bills.find(b => {
     if (!b.is_active) return false;
