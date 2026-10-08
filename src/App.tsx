@@ -85,6 +85,17 @@ export function App() {
     await refreshWallets();
   };
 
+  const handleRestoreTransaction = async (tx: any) => {
+    if (tx.type === 'expense' && tx.category_id) {
+      await addExpense({ amount: Number(tx.amount), wallet_id: tx.wallet_id, category_id: tx.category_id, date: tx.date, notes: tx.notes || undefined });
+    } else if (tx.type === 'income' && tx.source_id) {
+      await addIncome({ amount: Number(tx.amount), wallet_id: tx.wallet_id, source_id: tx.source_id, date: tx.date, notes: tx.notes || undefined });
+    } else if (tx.type === 'transfer' && tx.destination_wallet_id) {
+      await addTransfer({ amount: Number(tx.amount), wallet_id: tx.wallet_id, destination_wallet_id: tx.destination_wallet_id, admin_fee: Number(tx.admin_fee || 0), date: tx.date, notes: tx.notes || undefined });
+    }
+    await refreshWallets();
+  };
+
   const handleBillPaid = async () => {
     await refreshWallets();
     await refreshBills();
@@ -143,7 +154,6 @@ export function App() {
           setActiveTab(tab);
         }}
         onOpenAddModal={() => setIsModalOpen(true)}
-        onSignOut={signOut}
         showBackButton={showBillsSubScreen}
         onBack={() => setShowBillsSubScreen(false)}
       />
@@ -177,6 +187,7 @@ export function App() {
               transactions={transactions}
               activeWallets={activeWallets}
               onDeleteTransaction={handleDeleteTransaction}
+              onRestoreTransaction={handleRestoreTransaction}
               onOpenAddModal={() => setIsModalOpen(true)}
             />
           )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { WalletWithBalance, IncomeSource, ExpenseCategory, TransactionType } from '../../types';
-import { getTodayDateString } from '../../lib/format';
+import { getTodayDateString, formatNumberInput } from '../../lib/format';
+import { getCategoryStyle } from '../../lib/categoryIcons';
 
 interface TransactionModalProps {
   isOpen: boolean;
@@ -190,15 +191,53 @@ export function TransactionModal({
           <div className="form-group">
             <label className="form-label">Nominal (Rp)</label>
             <input
-              type="number"
+              type="text"
               inputMode="numeric"
               autoFocus
               className="form-input form-input-amount"
               placeholder="0"
               value={amountStr}
-              onChange={e => setAmountStr(e.target.value)}
+              onChange={e => setAmountStr(formatNumberInput(e.target.value))}
               required
             />
+            {/* Quick Chips Nominal Cepat */}
+            <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+              {[
+                { label: '+10rb', val: 10000 },
+                { label: '+20rb', val: 20000 },
+                { label: '+50rb', val: 50000 },
+                { label: '+100rb', val: 100000 }
+              ].map(chip => (
+                <button
+                  key={chip.label}
+                  type="button"
+                  onClick={() => {
+                    const current = parseInt(amountStr.replace(/\D/g, ''), 10) || 0;
+                    setAmountStr(formatNumberInput(String(current + chip.val)));
+                  }}
+                  className="filter-pill"
+                  style={{ fontSize: '12px', padding: '4px 10px' }}
+                >
+                  {chip.label}
+                </button>
+              ))}
+              {amountStr && (
+                <button
+                  type="button"
+                  onClick={() => setAmountStr('')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    fontSize: '12px',
+                    cursor: 'pointer',
+                    padding: '4px 8px'
+                  }}
+                >
+                  Reset
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Dompet Sumber */}
@@ -224,16 +263,29 @@ export function TransactionModal({
             <div className="form-group">
               <label className="form-label">Kategori</label>
               <div className="category-chips">
-                {activeCategories.map(c => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={`chip-btn ${categoryId === c.id ? 'selected' : ''}`}
-                    onClick={() => setCategoryId(c.id)}
-                  >
-                    {c.name}
-                  </button>
-                ))}
+                {activeCategories.map(c => {
+                  const style = getCategoryStyle(c.name, 'expense');
+                  const Icon = style.icon;
+                  const isSelected = categoryId === c.id;
+
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`chip-btn ${isSelected ? 'selected' : ''}`}
+                      onClick={() => setCategoryId(c.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Icon size={16} color={isSelected ? 'var(--accent)' : style.color} />
+                      <span>{c.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -243,16 +295,29 @@ export function TransactionModal({
             <div className="form-group">
               <label className="form-label">Sumber</label>
               <div className="category-chips">
-                {activeSources.map(s => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={`chip-btn ${sourceId === s.id ? 'selected' : ''}`}
-                    onClick={() => setSourceId(s.id)}
-                  >
-                    {s.name}
-                  </button>
-                ))}
+                {activeSources.map(s => {
+                  const style = getCategoryStyle(s.name, 'income');
+                  const Icon = style.icon;
+                  const isSelected = sourceId === s.id;
+
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className={`chip-btn ${isSelected ? 'selected' : ''}`}
+                      onClick={() => setSourceId(s.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <Icon size={16} color={isSelected ? 'var(--accent)' : style.color} />
+                      <span>{s.name}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}

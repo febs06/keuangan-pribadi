@@ -5,7 +5,6 @@ interface TopBarProps {
   activeTab?: TabType;
   onChangeTab?: (tab: TabType) => void;
   onOpenAddModal?: () => void;
-  onSignOut?: () => void;
   showBackButton?: boolean;
   onBack?: () => void;
 }
@@ -15,7 +14,6 @@ export function TopBar({
   activeTab,
   onChangeTab,
   onOpenAddModal,
-  onSignOut,
   showBackButton,
   onBack
 }: TopBarProps) {
@@ -85,19 +83,9 @@ export function TopBar({
             type="button"
             onClick={onOpenAddModal}
             className="btn btn-primary"
-            style={{ minHeight: '36px', padding: '0 14px', fontSize: '13px' }}
+            style={{ minHeight: '38px', padding: '0 16px', fontSize: '13.5px' }}
           >
             + Catat Transaksi
-          </button>
-        )}
-        {onSignOut && (
-          <button
-            type="button"
-            onClick={onSignOut}
-            className="btn btn-secondary"
-            style={{ minHeight: '36px', padding: '0 12px', fontSize: '13px' }}
-          >
-            Keluar
           </button>
         )}
       </div>

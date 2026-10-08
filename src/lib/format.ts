@@ -36,3 +36,10 @@ export function getTodayDateString(): string {
   const day = String(now.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+export function formatNumberInput(rawStr: string): string {
+  const clean = rawStr.replace(/\D/g, '');
+  if (!clean) return '';
+  return Number(clean).toLocaleString('id-ID');
+}
+

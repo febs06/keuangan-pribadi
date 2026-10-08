@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import type { MonthlySummary } from '../../types';
-import { formatShortRupiah } from '../../lib/format';
+import { formatRupiah, formatShortRupiah } from '../../lib/format';
 
 interface MonthlyBarChartProps {
   summaries: MonthlySummary[];
@@ -12,10 +13,12 @@ export function MonthlyBarChart({
   selectedMonth,
   onSelectMonth
 }: MonthlyBarChartProps) {
+  const [hoveredMonth, setHoveredMonth] = useState<string | null>(null);
+
   if (summaries.length === 0) {
     return (
-      <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '16px 0', textAlign: 'center' }}>
-        Belum ada data bulanan
+      <div style={{ color: 'var(--text-muted)', fontSize: '13px', padding: '24px 0', textAlign: 'center' }}>
+        Belum ada riwayat transaksi bulanan
       </div>
     );
   }
@@ -27,33 +30,66 @@ export function MonthlyBarChart({
     if (s.total_expense > maxVal) maxVal = s.total_expense;
   });
 
-  const chartHeight = 150;
+  const chartHeight = 160;
   const numItems = summaries.length;
-  const svgWidth = Math.max(numItems * 90, 460);
+  const svgWidth = Math.max(numItems * 90, 440);
   const colWidth = svgWidth / numItems;
+
+  const activeHoverData = summaries.find(s => s.month_year === (hoveredMonth || selectedMonth));
 
   return (
     <div>
-      {/* Legenda Ringkas */}
-      <div style={{ display: 'flex', gap: '16px', fontSize: '12px', marginBottom: '16px', justifyContent: 'flex-end' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--text-dim)', borderRadius: '2px' }} />
-          <span>Masuk</span>
+      {/* Header Info & Legenda */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <div>
+          <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            Tren Pemasukan vs Pengeluaran
+          </span>
+          {activeHoverData && (
+            <div style={{ fontSize: '12px', color: 'var(--text-dim)', marginTop: '2px' }}>
+              {activeHoverData.month_year}: Masuk <strong>{formatRupiah(activeHoverData.total_income)}</strong> • Keluar <strong>{formatRupiah(activeHoverData.total_expense)}</strong>
+            </div>
+          )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--accent)', borderRadius: '2px' }} />
-          <span>Keluar</span>
+
+        <div style={{ display: 'flex', gap: '14px', fontSize: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--income)', borderRadius: '2px' }} />
+            <span>Masuk</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ width: '10px', height: '10px', backgroundColor: 'var(--expense)', borderRadius: '2px' }} />
+            <span>Keluar</span>
+          </div>
         </div>
       </div>
 
       {/* SVG Canvas Bar Chart */}
-      <div style={{ width: '100%', height: `${chartHeight + 50}px`, position: 'relative' }}>
+      <div style={{ width: '100%', height: `${chartHeight + 54}px`, position: 'relative' }}>
         <svg
-          viewBox={`0 0 ${svgWidth} ${chartHeight + 50}`}
+          viewBox={`0 0 ${svgWidth} ${chartHeight + 54}`}
           width="100%"
           height="100%"
           style={{ overflow: 'visible' }}
         >
+          {/* Garis Grid Halus */}
+          {[0.25, 0.5, 0.75, 1].map(ratio => {
+            const y = chartHeight - chartHeight * ratio;
+            return (
+              <line
+                key={ratio}
+                x1="0"
+                y1={y}
+                x2={svgWidth}
+                y2={y}
+                stroke="var(--border-color)"
+                strokeDasharray="4 4"
+                strokeWidth="1"
+                opacity="0.6"
+              />
+            );
+          })}
+
           {/* Garis Dasar Nol */}
           <line
             x1="0"
@@ -61,17 +97,18 @@ export function MonthlyBarChart({
             x2={svgWidth}
             y2={chartHeight}
             stroke="var(--border-color)"
-            strokeWidth="1"
+            strokeWidth="1.5"
           />
 
           {summaries.map((s, idx) => {
             const isSelected = s.month_year === selectedMonth;
+            const isHovered = s.month_year === hoveredMonth;
             const xCenter = idx * colWidth + colWidth / 2;
-            
+
             // Hitung tinggi batang
-            const incH = Math.max(Math.round((s.total_income / maxVal) * chartHeight), s.total_income > 0 ? 4 : 0);
-            const expH = Math.max(Math.round((s.total_expense / maxVal) * chartHeight), s.total_expense > 0 ? 4 : 0);
-            
+            const incH = Math.max(Math.round((s.total_income / maxVal) * chartHeight), s.total_income > 0 ? 5 : 0);
+            const expH = Math.max(Math.round((s.total_expense / maxVal) * chartHeight), s.total_expense > 0 ? 5 : 0);
+
             const incY = chartHeight - incH;
             const expY = chartHeight - expH;
 
@@ -79,44 +116,51 @@ export function MonthlyBarChart({
             const [yStr, mStr] = s.month_year.split('-');
             const monthNum = parseInt(mStr, 10);
             const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-            const mLabel = `${monthNames[monthNum - 1] || mStr} ${yStr.slice(2)}`;
+            const mLabel = `${monthNames[monthNum - 1] || mStr} '${yStr.slice(2)}`;
 
             return (
               <g
                 key={s.month_year}
                 onClick={() => onSelectMonth(s.month_year)}
+                onMouseEnter={() => setHoveredMonth(s.month_year)}
+                onMouseLeave={() => setHoveredMonth(null)}
                 style={{ cursor: 'pointer' }}
               >
                 {/* Latar hover / terpilih */}
-                {isSelected && (
+                {(isSelected || isHovered) && (
                   <rect
                     x={idx * colWidth + 6}
                     y="0"
                     width={colWidth - 12}
-                    height={chartHeight + 42}
+                    height={chartHeight + 46}
                     fill="var(--bg-subtle)"
-                    rx="6"
+                    rx="8"
+                    opacity={isHovered ? 0.9 : 0.6}
                   />
                 )}
 
-                {/* Batang Pemasukan (Abu / Muted) */}
+                {/* Batang Pemasukan (Hijau / Income) */}
                 <rect
-                  x={xCenter - 20}
+                  x={xCenter - 22}
                   y={incY}
-                  width="16"
+                  width="18"
                   height={incH}
-                  fill="var(--text-dim)"
-                  rx="3"
+                  fill="var(--income)"
+                  rx="4"
+                  opacity={isHovered || isSelected ? 1 : 0.85}
+                  style={{ transition: 'all 0.2s ease' }}
                 />
 
-                {/* Batang Pengeluaran (Warna Aksen) */}
+                {/* Batang Pengeluaran (Merah / Expense) */}
                 <rect
                   x={xCenter + 4}
                   y={expY}
-                  width="16"
+                  width="18"
                   height={expH}
-                  fill="var(--accent)"
-                  rx="3"
+                  fill="var(--expense)"
+                  rx="4"
+                  opacity={isHovered || isSelected ? 1 : 0.85}
+                  style={{ transition: 'all 0.2s ease' }}
                 />
 
                 {/* Label Bulan */}
@@ -148,9 +192,15 @@ export function MonthlyBarChart({
         </svg>
       </div>
 
-      <div style={{ fontSize: '11px', color: 'var(--text-dim)', textAlign: 'center', marginTop: '8px' }}>
-        Ketuk bulan pada grafik untuk melihat rincian di samping
-      </div>
+      {summaries.length <= 1 ? (
+        <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', textAlign: 'center', marginTop: '12px' }}>
+          💡 Grafik tren bulanan akan terisi seiring bertambahnya bulan pencatatan transaksi Anda.
+        </div>
+      ) : (
+        <div style={{ fontSize: '11px', color: 'var(--text-dim)', textAlign: 'center', marginTop: '8px' }}>
+          Ketuk kolom bulan untuk melihat rincian pengeluaran per kategori
+        </div>
+      )}
     </div>
   );
 }

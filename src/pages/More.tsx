@@ -4,6 +4,16 @@ import { useSavings } from '../hooks/useSavings';
 import { useDebts } from '../hooks/useDebts';
 import { useRecurring } from '../hooks/useRecurring';
 import { formatRupiah, formatDateIndo, getTodayDateString } from '../lib/format';
+import {
+  Wallet as WalletIcon,
+  Receipt,
+  Tags,
+  HandCoins,
+  PiggyBank,
+  Repeat,
+  LogOut,
+  ChevronRight
+} from 'lucide-react';
 
 type MoreSection = 'menu' | 'wallets' | 'categories' | 'savings' | 'debts' | 'recurring';
 
@@ -216,112 +226,168 @@ export function More({
     </div>
   );
 
-  // 1. TAMPILAN UTAMA: MENU PILIHAN BERSIH (TIDAK BERTUMPUK)
+  // 1. TAMPILAN UTAMA: MENU PILIHAN BERSIH & TERORGANISIR
   if (currentSection === 'menu') {
+    const today = getTodayDateString();
     const unSettledDebtsCount = debts.filter(d => !d.is_settled).length;
+    const overdueCount = debts.filter(d => !d.is_settled && d.due_date && d.due_date < today).length;
 
     return (
       <div className="content-area">
-        <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-          Menu Pengaturan & Fitur Tambahan
-        </div>
-
-        <div className="more-menu-grid">
-          {/* 1. Tagihan Wajib */}
-          <button type="button" className="menu-card" onClick={onOpenBills}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div className="menu-card-title">Tagihan Wajib</div>
-                <span className="badge" style={{ backgroundColor: 'var(--bg-muted)' }}>Berkala</span>
-              </div>
-              <div className="menu-card-desc">Jatuh tempo bulanan & perhitungan sisihkan uang</div>
-            </div>
-            <span style={{ color: 'var(--text-dim)', fontSize: '18px' }}>→</span>
-          </button>
-
-          {/* 2. Dompet */}
-          <button type="button" className="menu-card" onClick={() => setCurrentSection('wallets')}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div className="menu-card-title">Kelola Dompet & Saldo</div>
-                <span className="badge" style={{ backgroundColor: 'var(--bg-muted)' }}>{activeWallets.length} aktif</span>
-              </div>
-              <div className="menu-card-desc">Atur saldo awal, tambah rekening/e-wallet, dan arsip</div>
-            </div>
-            <span style={{ color: 'var(--text-dim)', fontSize: '18px' }}>→</span>
-          </button>
-
-          {/* 3. Kategori & Sumber */}
-          <button type="button" className="menu-card" onClick={() => setCurrentSection('categories')}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div className="menu-card-title">Kategori & Sumber</div>
-                <span className="badge" style={{ backgroundColor: 'var(--bg-muted)' }}>{categories.length} pos</span>
-              </div>
-              <div className="menu-card-desc">Kelola pos pengeluaran & sumber uang masuk</div>
-            </div>
-            <span style={{ color: 'var(--text-dim)', fontSize: '18px' }}>→</span>
-          </button>
-
-          {/* 4. Utang & Piutang */}
-          <button type="button" className="menu-card" onClick={() => setCurrentSection('debts')}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div className="menu-card-title">Utang & Piutang</div>
-                {unSettledDebtsCount > 0 ? (
-                  <span className="badge" style={{ backgroundColor: 'rgba(220, 38, 38, 0.15)', color: 'var(--expense)' }}>
-                    {unSettledDebtsCount} aktif
-                  </span>
-                ) : (
-                  <span className="badge" style={{ backgroundColor: 'var(--bg-muted)' }}>Nihil</span>
-                )}
-              </div>
-              <div className="menu-card-desc">Catatan pinjaman, jatuh tempo, dan riwayat pelunasan</div>
-            </div>
-            <span style={{ color: 'var(--text-dim)', fontSize: '18px' }}>→</span>
-          </button>
-
-          {/* 5. Target Tabungan */}
-          <button type="button" className="menu-card" onClick={() => setCurrentSection('savings')}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div className="menu-card-title">Target Tabungan</div>
-                <span className="badge" style={{ backgroundColor: 'var(--bg-muted)' }}>{goals.length} target</span>
-              </div>
-              <div className="menu-card-desc">Catat progres impian tabungan pribadi</div>
-            </div>
-            <span style={{ color: 'var(--text-dim)', fontSize: '18px' }}>→</span>
-          </button>
-
-          {/* 6. Transaksi Rutin */}
-          <button type="button" className="menu-card" onClick={() => setCurrentSection('recurring')}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div className="menu-card-title">Transaksi Rutin</div>
-                <span className="badge" style={{ backgroundColor: 'var(--bg-muted)' }}>{rules.length} aturan</span>
-              </div>
-              <div className="menu-card-desc">Daftar langganan berkala (harian, mingguan, bulanan)</div>
-            </div>
-            <span style={{ color: 'var(--text-dim)', fontSize: '18px' }}>→</span>
-          </button>
-        </div>
-
-        {/* Informasi Akun & Sesi */}
-        <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-          <div>
-            <div style={{ fontWeight: 600, fontSize: '14px' }}>Sesi Pengguna</div>
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Masuk sebagai pengguna pribadi. Data tersinkronisasi aman ke database.
-            </div>
+        {/* GRUP 1: PENGELOLAAN KEUANGAN */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Pengelolaan Keuangan
           </div>
-          <button
-            type="button"
-            onClick={onSignOut}
-            className="btn btn-danger"
-            style={{ minHeight: '36px', padding: '0 16px', fontSize: '13px', whiteSpace: 'nowrap' }}
-          >
-            Keluar Akun
-          </button>
+
+          <div className="more-menu-grid">
+            {/* Tagihan Wajib */}
+            <button type="button" className="menu-card" onClick={onOpenBills}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(245, 158, 11, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Receipt size={20} color="#d97706" />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="menu-card-title">Tagihan Wajib</div>
+                    <span className="badge">Berkala</span>
+                  </div>
+                  <div className="menu-card-desc">Jatuh tempo bulanan & perhitungan sisihkan uang</div>
+                </div>
+              </div>
+              <ChevronRight size={18} color="var(--text-dim)" />
+            </button>
+
+            {/* Dompet */}
+            <button type="button" className="menu-card" onClick={() => setCurrentSection('wallets')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(37, 99, 235, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <WalletIcon size={20} color="var(--accent)" />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="menu-card-title">Kelola Dompet & Saldo</div>
+                    <span className="badge">{activeWallets.length} aktif</span>
+                  </div>
+                  <div className="menu-card-desc">Atur saldo awal, rekening/e-wallet, dan arsip</div>
+                </div>
+              </div>
+              <ChevronRight size={18} color="var(--text-dim)" />
+            </button>
+
+            {/* Kategori & Sumber */}
+            <button type="button" className="menu-card" onClick={() => setCurrentSection('categories')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(139, 92, 246, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Tags size={20} color="#8b5cf6" />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="menu-card-title">Kategori & Sumber</div>
+                    <span className="badge">{categories.length} pos</span>
+                  </div>
+                  <div className="menu-card-desc">Kelola pos pengeluaran & sumber uang masuk</div>
+                </div>
+              </div>
+              <ChevronRight size={18} color="var(--text-dim)" />
+            </button>
+
+            {/* Utang & Piutang */}
+            <button type="button" className="menu-card" onClick={() => setCurrentSection('debts')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(5, 150, 105, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <HandCoins size={20} color="#059669" />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="menu-card-title">Utang & Piutang</div>
+                    {overdueCount > 0 ? (
+                      <span className="badge" style={{ backgroundColor: 'rgba(220, 38, 38, 0.15)', color: 'var(--expense)' }}>
+                        {overdueCount} lewat tempo
+                      </span>
+                    ) : unSettledDebtsCount > 0 ? (
+                      <span className="badge" style={{ backgroundColor: 'var(--bg-muted)' }}>
+                        {unSettledDebtsCount} aktif
+                      </span>
+                    ) : (
+                      <span className="badge" style={{ backgroundColor: 'var(--bg-muted)' }}>Nihil</span>
+                    )}
+                  </div>
+                  <div className="menu-card-desc">Catatan pinjaman, jatuh tempo, dan pelunasan</div>
+                </div>
+              </div>
+              <ChevronRight size={18} color="var(--text-dim)" />
+            </button>
+
+            {/* Target Tabungan */}
+            <button type="button" className="menu-card" onClick={() => setCurrentSection('savings')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(236, 72, 153, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <PiggyBank size={20} color="#ec4899" />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="menu-card-title">Target Tabungan</div>
+                    <span className="badge">
+                      {goals.length > 0 ? `${goals.length} target` : 'Mulai menabung'}
+                    </span>
+                  </div>
+                  <div className="menu-card-desc">Catat progres impian tabungan pribadi</div>
+                </div>
+              </div>
+              <ChevronRight size={18} color="var(--text-dim)" />
+            </button>
+          </div>
+        </div>
+
+        {/* GRUP 2: OTOMASI */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Otomasi & Rutinitas
+          </div>
+
+          <div className="more-menu-grid">
+            <button type="button" className="menu-card" onClick={() => setCurrentSection('recurring')}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{ width: '38px', height: '38px', borderRadius: '10px', backgroundColor: 'rgba(14, 165, 233, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Repeat size={20} color="#0284c7" />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div className="menu-card-title">Transaksi Rutin</div>
+                    <span className="badge">{rules.length} aturan</span>
+                  </div>
+                  <div className="menu-card-desc">Daftar langganan berkala (harian, mingguan, bulanan)</div>
+                </div>
+              </div>
+              <ChevronRight size={18} color="var(--text-dim)" />
+            </button>
+          </div>
+        </div>
+
+        {/* GRUP 3: AKUN & SESI */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '6px' }}>
+          <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            Akun & Keamanan
+          </div>
+
+          <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '14.5px' }}>Sesi Pengguna</div>
+              <div style={{ fontSize: '12.5px', color: 'var(--text-muted)', marginTop: '2px' }}>
+                Terkoneksi aman dengan enkripsi RLS database Supabase.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="btn btn-danger"
+              style={{ minHeight: '38px', padding: '0 16px', fontSize: '13px', whiteSpace: 'nowrap' }}
+            >
+              <LogOut size={15} />
+              Keluar Akun
+            </button>
+          </div>
         </div>
       </div>
     );
