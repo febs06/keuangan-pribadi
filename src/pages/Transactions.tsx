@@ -240,7 +240,7 @@ export function Transactions({
                     marginBottom: '4px'
                   }}
                 >
-                  <span style={{ fontSize: '12.5px', fontWeight: 700, color: 'var(--text-muted)' }}>
+                  <span style={{ fontSize: '11.5px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                     {group.label}
                   </span>
                   <div style={{ fontSize: '11.5px', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '6px' }}>

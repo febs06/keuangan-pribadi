@@ -175,14 +175,14 @@ export function Budgets({ categories }: BudgetsProps) {
                   {totalPercent}% ({totalStatus.label})
                 </span>
               </div>
-              <div style={{ width: '100%', height: '8px', backgroundColor: 'var(--bg-muted)', borderRadius: '999px', overflow: 'hidden' }}>
+              <div style={{ width: '100%', height: '5px', backgroundColor: 'var(--bg-muted)', borderRadius: '2px', overflow: 'hidden' }}>
                 <div
                   style={{
                     width: `${clampedTotalPercent}%`,
                     height: '100%',
                     backgroundColor: totalStatus.color,
-                    borderRadius: '999px',
-                    transition: 'width 0.5s ease'
+                    borderRadius: '2px',
+                    transition: 'width 0.4s ease'
                   }}
                 />
               </div>
@@ -363,14 +363,14 @@ export function Budgets({ categories }: BudgetsProps) {
                         </span>
                       </div>
 
-                      {/* Progress bar visual proporsional */}
-                      <div style={{ width: '100%', height: '7px', backgroundColor: 'var(--bg-muted)', borderRadius: '999px', overflow: 'hidden' }}>
+                      {/* Progress bar meter ramping presisi */}
+                      <div style={{ width: '100%', height: '4px', backgroundColor: 'var(--bg-muted)', borderRadius: '2px', overflow: 'hidden' }}>
                         <div
                           style={{
                             width: `${clampedPercent}%`,
                             height: '100%',
                             backgroundColor: status.color,
-                            borderRadius: '999px',
+                            borderRadius: '2px',
                             transition: 'width 0.4s ease'
                           }}
                         />

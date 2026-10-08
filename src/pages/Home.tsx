@@ -40,76 +40,76 @@ export function Home({
     <div className="content-area">
       {/* 1. Baris Hero & Metrik */}
       <div className="desktop-stat-grid">
-        {/* HERO CARD: Total Saldo Aktif */}
+        {/* HERO CARD: Total Saldo Finansial Monolith */}
         <div
           className="card stat-card"
           style={{
             gridColumn: '1 / -1',
-            background: 'linear-gradient(135deg, var(--bg-surface) 0%, var(--bg-subtle) 100%)',
-            border: '1.5px solid var(--border-color)',
-            padding: '22px 24px',
+            backgroundColor: 'var(--bg-surface)',
+            border: '1px solid var(--border-color)',
+            padding: '24px 28px',
             position: 'relative'
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--accent)', boxShadow: '0 0 0 3px var(--accent-subtle)' }} />
-              <span className="stat-label" style={{ fontSize: '12px' }}>Total Saldo Finansial</span>
+              <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--accent-dot)', boxShadow: '0 0 0 2px rgba(197, 168, 128, 0.25)' }} />
+              <span className="stat-label">Total Saldo Finansial</span>
             </div>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 500 }}>
+            <span style={{ fontSize: '11.5px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 500 }}>
               {currentMonthName}
             </span>
           </div>
 
-          <div className="stat-value" style={{ fontSize: '30px', fontWeight: 800, letterSpacing: '-0.03em', margin: '6px 0' }}>
+          <div className="stat-value" style={{ fontSize: '34px', fontWeight: 700, letterSpacing: '-0.03em', margin: '8px 0' }}>
             {formatRupiah(totalBalance)}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12.5px', color: 'var(--text-dim)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px', color: 'var(--text-dim)', borderTop: '1px solid var(--border-color)', paddingTop: '12px', marginTop: '4px' }}>
             <span>{activeWallets.length} rekening aktif terhubung</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--income)' }}>
-              <ShieldCheck size={14} /> Data tersinkron
+            <span style={{ display: 'flex', alignItems: 'center', gap: '5px', color: 'var(--income)', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '11px', fontWeight: 600 }}>
+              <ShieldCheck size={13} /> Data tersinkron
             </span>
           </div>
         </div>
 
         {/* METRIK SEKUNDER 1: Pemasukan Hari Ini */}
-        <div className="card stat-card" style={{ padding: '16px 18px' }}>
+        <div className="card stat-card" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="stat-label">Pemasukan Hari Ini</div>
-            <div style={{ width: '22px', height: '22px', borderRadius: '6px', backgroundColor: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ArrowDownLeft size={14} color="var(--income)" />
+            <div style={{ width: '24px', height: '24px', borderRadius: '4px', backgroundColor: 'var(--bg-subtle)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowDownLeft size={13} color="var(--income)" />
             </div>
           </div>
-          <div className="stat-value amount-income" style={{ fontSize: '18px' }}>
+          <div className="stat-value amount-income" style={{ fontSize: '19px', marginTop: '4px' }}>
             {formatRupiah(todaySummary.income)}
           </div>
           <div className="stat-sub">Arus kas masuk hari ini</div>
         </div>
 
         {/* METRIK SEKUNDER 2: Pengeluaran Hari Ini */}
-        <div className="card stat-card" style={{ padding: '16px 18px' }}>
+        <div className="card stat-card" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="stat-label">Pengeluaran Hari Ini</div>
-            <div style={{ width: '22px', height: '22px', borderRadius: '6px', backgroundColor: 'rgba(239, 68, 68, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ArrowUpRight size={14} color="var(--expense)" />
+            <div style={{ width: '24px', height: '24px', borderRadius: '4px', backgroundColor: 'var(--bg-subtle)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <ArrowUpRight size={13} color="var(--expense)" />
             </div>
           </div>
-          <div className="stat-value amount-expense" style={{ fontSize: '18px' }}>
+          <div className="stat-value amount-expense" style={{ fontSize: '19px', marginTop: '4px' }}>
             {formatRupiah(todaySummary.expense)}
           </div>
           <div className="stat-sub">Arus kas keluar hari ini</div>
         </div>
 
         {/* METRIK SEKUNDER 3: Sisa Anggaran Bulan Ini */}
-        <div className="card stat-card" style={{ padding: '16px 18px' }}>
+        <div className="card stat-card" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="stat-label">Sisa Anggaran</div>
-            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#8b5cf6' }} />
+            <span style={{ width: '7px', height: '7px', borderRadius: '50%', backgroundColor: 'var(--accent)' }} />
           </div>
           <div
             className={`stat-value ${hasBudget && totalBudgetRemaining < 0 ? 'amount-expense' : ''}`}
-            style={{ fontSize: '18px' }}
+            style={{ fontSize: '19px', marginTop: '4px' }}
           >
             {hasBudget ? formatRupiah(totalBudgetRemaining) : 'Belum diatur'}
           </div>
