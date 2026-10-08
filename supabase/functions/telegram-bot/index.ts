@@ -1,7 +1,8 @@
 // Supabase Edge Function: telegram-bot
 // Menerima Webhook Telegram, mengekstrak struk/nota/bukti transfer via Gemini Vision,
-// mengenali pertanyaan bahasa sehari-hari (cek saldo spesifik / semua dompet, greeting, dll),
+// mengenali pertanyaan bahasa sehari-hari (cek saldo, greeting, dll),
 // mendukung atur saldo (misal: "di dana ada 600 perak"),
+// mendukung pencatatan & cek utang/piutang (misal: "masukkan ke piutang dua carita 26364", "cek utang"),
 // mendukung koreksi/ralat/pembatalan transaksi terakhir,
 // mencatat transaksi ke database Supabase, dan membalas ke pengguna di Telegram.
 
@@ -17,8 +18,16 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || D
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Urutan model Gemini yang aktif & stabil
-const CANDIDATE_MODELS = [
+// Urutan model Vision OCR (Gunakan Gemini 3.8 Flash untuk akurasi tinggi pada struk)
+const CANDIDATE_VISION_MODELS = [
+  "gemini-3.8-flash",
+  "gemini-3.5-flash",
+  "gemini-flash-latest",
+  "gemini-3.5-flash-lite",
+];
+
+// Urutan model Text NLP Cepat
+const CANDIDATE_TEXT_MODELS = [
   "gemini-3.5-flash-lite",
   "gemini-3.8-flash",
   "gemini-flash-latest",
@@ -97,7 +106,55 @@ function fallbackParseIndonesianText(text: string) {
     return { intent: "correct_transaction", new_wallet_name };
   }
 
-  // 3. Deteksi atur saldo / update saldo dompet (misal: "di dana ada 600 perak", "saldo bca ada 50rb")
+  // 3. Deteksi cek daftar utang / piutang
+  if (
+    /(cek|lihat|daftar|info|ada)\s*(utang|piutang|kasbon)/i.test(lower) ||
+    /(utang|piutang|kasbon)\s*(apa aja|berapa|daftar)/i.test(lower) ||
+    /^(\/utang|\/piutang|cek utang|cek piutang)$/i.test(lower)
+  ) {
+    return { intent: "check_debt" };
+  }
+
+  // 4. Deteksi pelunasan utang / piutang
+  if (
+    /(lunas|lunasi|sudah bayar|sdh bayar|bayar utang)/i.test(lower) &&
+    /(utang|piutang|ke|dari)/i.test(lower)
+  ) {
+    let person = "";
+    const m = lower.match(/(?:ke|dari|nama|pihak)\s+([a-zA-Z0-9\s]+?)(?:\s+(?:sebesar|lunas|rp|\d+)|$)/i);
+    if (m) {
+      person = m[1].replace(/dulu|aja|deh|dong/g, "").trim();
+    }
+    return { intent: "settle_debt", person_name: person };
+  }
+
+  // 5. Deteksi pencatatan utang / piutang
+  if (/(piutang|ngutang|utang|pinjam|minjam|minjem|minjemin|talangin|kasbon)/i.test(lower)) {
+    let debt_type = "debt";
+    if (/(piutang|minjemin|talangin|ngutang ke aku|pinjam ke aku)/i.test(lower)) {
+      debt_type = "receivable";
+    }
+
+    let person_name = "";
+    const nameMatch = lower.match(/(?:ke|dari|untuk|piutang|utang)\s+([a-zA-Z0-9\s]+?)(?:\s+(?:sebesar|rp|\d+)|$)/i);
+    if (nameMatch) {
+      person_name = nameMatch[1]
+        .replace(/^(ke|dari|untuk|piutang|utang)\s+/i, "")
+        .replace(/dulu|aja|deh|dong/g, "")
+        .trim();
+    }
+
+    const amount = extractIndonesianNominal(text);
+    return {
+      intent: "record_debt",
+      debt_type,
+      person_name: person_name || "Lainnya",
+      amount,
+      notes: text,
+    };
+  }
+
+  // 6. Deteksi atur saldo / update saldo dompet (misal: "di dana ada 600 perak")
   if (
     /(di\s+(dana|bca|jago|dompet|tunai)\s+ada\s+\d+)|(saldo\s+(dana|bca|jago|dompet|tunai)\s+(ada|jadi)\s+\d+)|(atur\s+saldo\s+(dana|bca|jago|dompet|tunai))/i.test(lower)
   ) {
@@ -111,7 +168,7 @@ function fallbackParseIndonesianText(text: string) {
     return { intent: "set_balance", wallet_name, amount };
   }
 
-  // 4. Deteksi pertanyaan saldo / cek saldo bahasa santai
+  // 7. Deteksi pertanyaan saldo / cek saldo bahasa santai
   if (
     /(berapa|cek|sisa|total|ada berapa|info|ringkasan).*(saldo|uang|duit|rekening|dompet|bca|dana|jago)/i.test(lower) ||
     /(saldo|uang|duit|rekening|dompet|bca|dana|jago).*(berapa|cek|sisa|total)/i.test(lower) ||
@@ -126,12 +183,12 @@ function fallbackParseIndonesianText(text: string) {
     return { intent: "check_balance", wallet_name };
   }
 
-  // 5. Deteksi sapaan
+  // 8. Deteksi sapaan
   if (/^(halo|hai|hi|hey|p|tes|test|pagi|siang|sore|malam|assalamualaikum)/i.test(lower)) {
     return { intent: "greeting" };
   }
 
-  // 6. Deteksi pencatatan transaksi
+  // 9. Deteksi pencatatan transaksi
   let type: "expense" | "income" = "expense";
   if (/nemu|dapat|dapet|gaji|terima|bonus|kembalian|cair|dikasih|masuk/i.test(lower)) {
     type = "income";
@@ -151,33 +208,56 @@ function fallbackParseIndonesianText(text: string) {
     else if (/bonus/i.test(lower)) category_or_source = "Bonus";
     else category_or_source = "Pemasukan Lain";
   } else {
-    if (/makan|jajan|kopi|bakso|mie|nasi|es|ayam|snack|geprek/i.test(lower)) category_or_source = "Makan/jajan";
+    if (/makan|jajan|kopi|bakso|mie|nasi|es|ayam|snack|geprek|gacoan/i.test(lower)) category_or_source = "Makan/jajan";
     else if (/bensin|parkir|gojek|grab|ojol|tol/i.test(lower)) category_or_source = "Transport";
-    else if (/beli|belanja|baju|sepatu/i.test(lower)) category_or_source = "Belanja";
+    else if (/beli|belanja|baju|sepatu/i.test(lower)) category_or_source = "Kebutuhan";
     else if (/wifi|listrik|air|pulsa|kuota|kos/i.test(lower)) category_or_source = "Tagihan";
   }
 
   return { intent: "record_transaction", type, amount, wallet_name, category_or_source, notes: text, date: null };
 }
 
-// Analisis Foto Struk / Nota dengan Gemini Vision
+// Analisis Foto Struk / Nota dengan Gemini Vision (Model 3.8 Flash Prioritas)
 async function analyzeReceiptWithGemini(base64Image: string, mimeType: string) {
-  const prompt = `Kamu adalah asisten keuangan pribadi. Analisis gambar struk belanja, nota, atau tangkapan layar bukti transfer uang berikut.
-Kembalikan HANYA JSON MURNI tanpa markdown atau formatting apapun:
+  const todayStr = new Date().toISOString().split("T")[0];
+  const prompt = `Kamu adalah sistem OCR dan analisis struk belanja kasir / nota / bukti transfer yang SANGAT TELITI dan AKURAT.
+Analisis gambar struk belanja kasir atau bukti pembayaran ini.
+
+ATURAN EKSTRAKSI NOMINAL (amount):
+1. "amount": Cari dan ambil angka TOTAL AKHIR belanja yang harus dibayar konsumen (biasanya berlabel "Total Payable", "Total", "Grand Total", "Total Belanja", "Subtotal").
+   - SANGAT PENTING: JANGAN mengambil nominal pembayaran kasir sebelum kembalian (contoh: jika tertulis "Subtotal 42.000", "Total Payable 42.000", "Cash 50.000", "Change 8.000", maka "amount" adalah 42000, BUKAN 50000 dan BUKAN 100000).
+   - "amount" harus berupa angka bulat integer murni tanpa koma/titik/Rp.
+
+ATURAN DOMPET (wallet_name):
+2. "wallet_name":
+   - Jika di struk tertera metode bayar "Cash", "Tunai", atau ada "Change" (kembalian uang tunai), gunakan "Dompet".
+   - Jika tertera "Debit BCA", "BCA", "QRIS BCA", gunakan "BCA".
+   - Jika tertera "Dana" atau "QRIS Dana", gunakan "Dana".
+   - Jika tertera "Jago", gunakan "Jago".
+   - Jika tidak yakin / tidak tertulis, default ke "Dompet".
+
+ATURAN KATEGORI (category_or_source):
+3. "category_or_source":
+   - "Kebutuhan": untuk pakaian, fashion, toserba, minimarket, sabun, sampo, deodoran, kosmetik, perlengkapan mandi/rumah.
+   - "Makan/jajan": untuk restoran, cafe, kedai, warung makan, gacoan, geprek, kfc, bakery, snack.
+   - "Transport": untuk SPBU, bensin, parkir, tol, gojek, grab.
+   - "Tagihan": untuk listrik, air, wifi, pulsa, kos.
+
+ATURAN TANGGAL & CATATAN:
+4. "date": Ambil tanggal transaksi yang tertera di struk format YYYY-MM-DD. Perhatikan tahun pada struk (tahun sekarang 2026). Jika tanggal/tahun buram atau tidak terbaca jelas, gunakan tanggal hari ini (${todayStr}). JANGAN mengarang tahun lama!
+5. "notes": Tulis nama toko dan 1-2 ringkasan barang utama (contoh: "Fashion Boras Dago (Gatsby Deo, MZ HK)").
+
+Kembalikan HANYA JSON MURNI tanpa markdown:
 {
   "type": "expense" atau "income",
-  "amount": 50000,
-  "wallet_name": "BCA" atau "Dana" atau "Jago" atau "Dompet",
-  "category_or_source": "Makan/jajan" atau "Belanja" atau "Transport" atau "Kebutuhan",
-  "notes": "Nama toko / keterangan ringkas",
+  "amount": 42000,
+  "wallet_name": "Dompet",
+  "category_or_source": "Kebutuhan",
+  "notes": "Fashion Boras Dago",
   "date": "YYYY-MM-DD"
-}
-Aturan:
-1. "amount" harus angka bulat positif tanpa tanda titik, koma, atau simbol Rp.
-2. Jika terdeteksi transfer keluar atau struk belanja, type "expense". Jika transfer masuk, type "income".
-3. "wallet_name": "BCA", "Dana", "Jago", atau "Dompet". Jika tidak yakin, gunakan "Dompet".`;
+}`;
 
-  for (const model of CANDIDATE_MODELS) {
+  for (const model of CANDIDATE_VISION_MODELS) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
       const response = await fetch(url, {
@@ -209,9 +289,13 @@ Aturan:
       }
 
       const result = await response.json();
-      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const parts = result.candidates?.[0]?.content?.parts || [];
+      const rawText = parts.map((p: any) => p.text || "").join("") || "{}";
       const cleanJson = rawText.trim().replace(/^```json/, "").replace(/```$/, "").trim();
-      return JSON.parse(cleanJson);
+      const parsed = JSON.parse(cleanJson);
+      if (parsed.amount && parsed.amount > 0) {
+        return parsed;
+      }
     } catch (err) {
       console.warn(`Percobaan model ${model} gagal:`, err);
     }
@@ -220,32 +304,39 @@ Aturan:
   throw new Error("Semua model Gemini Vision gagal memproses gambar.");
 }
 
-// Analisis Pesan Teks Bahasa Sehari-hari dengan Gemini
+// Analisis Pesan Teks Bahasa Sehari-hari dengan Gemini NLP
 async function analyzeTextWithGemini(text: string) {
   const prompt = `Kamu adalah asisten keuangan pribadi cerdas. Analisis pesan pengguna bahasa Indonesia berikut: "${text}"
 Identifikasi maksud pengguna secara cerdas:
-1. "set_balance": jika pengguna menginformasikan atau mengatur saldo saat ini dari suatu dompet (contoh: "di dana ada 600 perak", "saldo bca ada 50rb", "atur saldo dompet jadi 100rb"). Catatan: "perak" berarti rupiah (contoh: 600 perak = 600).
-2. "correct_transaction": jika pengguna ingin meralat/mengoreksi transaksi terakhir (contoh: "bukan pake bca, tapi pake uang tunai", "bukan bca tapi dana", "ganti dompet ke dompet", "salah dompet", "ralat tadi 20rb")
-3. "delete_transaction": jika membatalkan/menghapus transaksi terakhir (contoh: "batalkan transaksi tadi", "hapus transaksi barusan", "ga jadi catat")
-4. "check_balance": jika menanyakan saldo/uang (contoh: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa")
-5. "record_transaction": jika mencatat transaksi baru (contoh: "jajan bakso 20rb", "nemu duit 2ribu")
-6. "greeting": jika menyapa (contoh: "halo", "hai")
-7. "other": lainnya
+1. "record_debt": jika pengguna mencatat UTANG atau PIUTANG (contoh: "masukkan ke piutang dua carita 26364", "ngutang dulu ke dua carita 26364", "utang ke budi 50rb", "andi pinjam uang 100rb").
+   - Jika pengguna yang berutang ke orang lain ("ngutang ke X", "pinjam ke X", "utang ke X") -> debt_type: "debt"
+   - Jika orang lain yang berutang ke pengguna ("piutang X", "masukkan ke piutang X", "X ngutang ke aku", "talangin X") -> debt_type: "receivable"
+2. "check_debt": jika menanyakan daftar utang atau piutang (contoh: "cek utang", "ada utang apa aja", "cek piutang")
+3. "settle_debt": jika melunasi utang atau piutang (contoh: "lunasi utang ke dua carita", "budi sudah bayar utang", "utang ke budi lunas")
+4. "set_balance": jika pengguna menginformasikan atau mengatur saldo dompet (contoh: "di dana ada 600 perak", "saldo bca ada 50rb"). Catatan: "perak" berarti rupiah (contoh: 600 perak = 600).
+5. "correct_transaction": jika pengguna ingin meralat/mengoreksi transaksi terakhir (contoh: "bukan pake bca, tapi pake uang tunai", "bukan bca tapi dana", "ralat tadi 20rb")
+6. "delete_transaction": jika membatalkan/menghapus transaksi terakhir (contoh: "batalkan transaksi tadi", "hapus transaksi barusan", "ga jadi catat")
+7. "check_balance": jika menanyakan saldo/uang (contoh: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa")
+8. "record_transaction": jika mencatat pengeluaran/pemasukan baru (contoh: "jajan bakso 20rb", "nemu duit 2ribu")
+9. "greeting": jika menyapa (contoh: "halo", "hai")
+10. "other": lainnya
 
 Kembalikan format JSON murni:
 {
-  "intent": "set_balance" | "correct_transaction" | "delete_transaction" | "check_balance" | "record_transaction" | "greeting" | "other",
+  "intent": string,
+  "debt_type": "debt" | "receivable" | null,
+  "person_name": string | null,
   "new_wallet_name": "BCA" | "Dana" | "Jago" | "Dompet" | null,
-  "new_amount": angka bulat positif atau null,
-  "type": "expense" atau "income" atau null,
-  "amount": angka bulat nominal atau null,
+  "new_amount": number | null,
+  "type": "expense" | "income" | null,
+  "amount": number | null,
   "wallet_name": "BCA" | "Dana" | "Jago" | "Dompet" | null,
-  "category_or_source": kategori atau sumber ringkas atau null,
-  "notes": keterangan ringkas atau null,
+  "category_or_source": string | null,
+  "notes": string | null,
   "date": null
 }`;
 
-  for (const model of CANDIDATE_MODELS) {
+  for (const model of CANDIDATE_TEXT_MODELS) {
     try {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
       const response = await fetch(url, {
@@ -263,7 +354,8 @@ Kembalikan format JSON murni:
       }
 
       const result = await response.json();
-      const rawText = result.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+      const parts = result.candidates?.[0]?.content?.parts || [];
+      const rawText = parts.map((p: any) => p.text || "").join("") || "{}";
       const cleanJson = rawText.trim().replace(/^```json/, "").replace(/```$/, "").trim();
       const parsed = JSON.parse(cleanJson);
       if (parsed.intent) {
@@ -307,7 +399,7 @@ serve(async (req) => {
 
     // 1. Perintah Bantuan / Mulai
     if (text === "/start" || text === "/help") {
-      const welcome = `Halo Febri! Asisten Keuangan aktif 24 jam.\n\nKamu bisa bicara dengan bahasa santai:\n• Tanya saldo: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa?"\n• Atur saldo: "di dana ada 600 perak", "saldo bca ada 50rb"\n• Catat pengeluaran: "tadi sore jajan geprek 18rb", "jajan kopi 25rb bca"\n• Ralat / Koreksi: "bukan pake bca, tapi pake uang tunai", "ralat tadi 20rb"\n• Batalkan: "batalkan transaksi tadi"\n• Kirim foto struk belanja / bukti transfer langsung ke chat ini.`;
+      const welcome = `Halo Febri! Asisten Keuangan aktif 24 jam.\n\nKamu bisa bicara dengan bahasa santai:\n• Foto Struk: Kirim foto struk belanja / nota / transferan kasir langsung.\n• Utang / Piutang: "ngutang dulu ke dua carita 26364", "masukkan ke piutang budi 50rb", "cek utang"\n• Pelunasan Utang: "lunasi utang ke dua carita"\n• Catat Pengeluaran: "tadi sore jajan geprek 18rb", "bayar gacoan 26364 pake bca"\n• Catat Pemasukan: "nemu duit 2ribu di laci", "gaji 5jt bca"\n• Tanya Saldo: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa?"\n• Atur Saldo: "di dana ada 600 perak"\n• Ralat / Koreksi: "bukan pake bca, tapi pake uang tunai"\n• Batalkan: "batalkan transaksi tadi"`;
       await sendTelegramMessage(chatId, welcome);
       return new Response("OK", { status: 200 });
     }
@@ -348,7 +440,7 @@ serve(async (req) => {
       }
 
       if (!parsedData.amount || parsedData.amount <= 0) {
-        await sendTelegramMessage(chatId, "Nominal tidak terbaca jelas pada gambar. Silakan kirim foto yang lebih terang atau ketik manual.");
+        await sendTelegramMessage(chatId, "Nominal tidak terbaca jelas pada struk. Silakan kirim foto yang lebih terang atau ketik manual.");
         return new Response("OK", { status: 200 });
       }
 
@@ -396,7 +488,72 @@ serve(async (req) => {
       // Analisis Pesan dengan Gemini AI (Intent Detection)
       const parsedData = await analyzeTextWithGemini(text);
 
-      // A. Maksud: Mengatur / Memperbarui Saldo Dompet (misal: "di dana ada 600 perak")
+      // A. Maksud: Pencatatan Utang atau Piutang
+      if (parsedData.intent === "record_debt") {
+        const debtType = parsedData.debt_type || (lowerText.includes("piutang") ? "receivable" : "debt");
+        const person = parsedData.person_name || "Lainnya";
+        const amt = parsedData.amount !== null && parsedData.amount !== undefined && parsedData.amount > 0
+          ? Math.round(Number(parsedData.amount))
+          : extractIndonesianNominal(text);
+
+        if (!amt || amt <= 0) {
+          await sendTelegramMessage(chatId, "Nominal utang/piutang tidak terbaca. Contoh: 'ngutang ke dua carita 26364' atau 'masukkan ke piutang budi 50rb'");
+          return new Response("OK", { status: 200 });
+        }
+
+        const { data: debtResult, error: debtError } = await supabase.rpc("create_debt_from_bot", {
+          p_chat_id: chatId,
+          p_type: debtType,
+          p_person_name: person,
+          p_amount: amt,
+          p_due_date: parsedData.date || null,
+          p_notes: parsedData.notes || text,
+        });
+
+        if (debtError || !debtResult?.success) {
+          await sendTelegramMessage(chatId, "Gagal mencatat utang/piutang: " + (debtError?.message || debtResult?.error));
+        } else {
+          await sendTelegramMessage(chatId, debtResult.reply_message);
+        }
+        return new Response("OK", { status: 200 });
+      }
+
+      // B. Maksud: Cek Daftar Utang & Piutang
+      if (parsedData.intent === "check_debt") {
+        const { data: debtData, error: debtError } = await supabase.rpc("get_bot_debt_summary", {
+          p_chat_id: chatId,
+        });
+
+        if (debtError || !debtData?.success) {
+          await sendTelegramMessage(chatId, "Gagal mengambil data utang: " + (debtError?.message || debtData?.error));
+        } else {
+          await sendTelegramMessage(chatId, debtData.reply_message);
+        }
+        return new Response("OK", { status: 200 });
+      }
+
+      // C. Maksud: Lunasi Utang / Piutang
+      if (parsedData.intent === "settle_debt") {
+        const person = parsedData.person_name || "";
+        if (!person) {
+          await sendTelegramMessage(chatId, "Sebutkan nama pihak yang ingin dilunasi. Contoh: 'lunasi utang ke dua carita'");
+          return new Response("OK", { status: 200 });
+        }
+
+        const { data: settleResult, error: settleError } = await supabase.rpc("settle_debt_from_bot", {
+          p_chat_id: chatId,
+          p_person_name: person,
+        });
+
+        if (settleError || !settleResult?.success) {
+          await sendTelegramMessage(chatId, "Gagal melunasi: " + (settleError?.message || settleResult?.error));
+        } else {
+          await sendTelegramMessage(chatId, settleResult.reply_message);
+        }
+        return new Response("OK", { status: 200 });
+      }
+
+      // D. Maksud: Mengatur / Memperbarui Saldo Dompet (misal: "di dana ada 600 perak")
       if (parsedData.intent === "set_balance") {
         let walletName = parsedData.wallet_name || null;
         if (!walletName) {
@@ -424,7 +581,7 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // B. Maksud: Koreksi Transaksi Terakhir (misal: "bukan pake bca, tapi pake uang tunai")
+      // E. Maksud: Koreksi Transaksi Terakhir (misal: "bukan pake bca, tapi pake uang tunai")
       if (parsedData.intent === "correct_transaction") {
         let newWallet = parsedData.new_wallet_name || null;
         if (!newWallet) {
@@ -450,7 +607,7 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // C. Maksud: Batalkan Transaksi Terakhir
+      // F. Maksud: Batalkan Transaksi Terakhir
       if (parsedData.intent === "delete_transaction") {
         const { data, error } = await supabase.rpc("delete_last_transaction_from_bot", {
           p_chat_id: chatId,
@@ -464,7 +621,7 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // D. Maksud: Menanyakan Saldo (Bisa spesifik 1 dompet atau seluruhnya)
+      // G. Maksud: Menanyakan Saldo (Bisa spesifik 1 dompet atau seluruhnya)
       if (parsedData.intent === "check_balance") {
         let targetWallet = parsedData.wallet_name || null;
         if (!targetWallet) {
@@ -487,14 +644,14 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // E. Maksud: Sapaan (Greeting)
+      // H. Maksud: Sapaan (Greeting)
       if (parsedData.intent === "greeting") {
-        const replyGreeting = `Halo Febri! Ada yang bisa dibantu?\n\nKamu bisa langsung ketik:\n• "berapa saldo sekarang?" atau "cek dompet dong"\n• "di dana ada 600 perak" (atur saldo)\n• "tadi sore jajan geprek 18rb"\n• Ralat: "bukan pake bca, tapi pake uang tunai"\natau kirim foto struk belanja.`;
+        const replyGreeting = `Halo Febri! Ada yang bisa dibantu?\n\nKamu bisa langsung ketik:\n• Foto Struk: Kirim foto struk kasir / bukti transfer\n• Utang / Piutang: "ngutang dulu ke dua carita 26364", "masukkan ke piutang budi 50rb", "cek utang"\n• Pelunasan Utang: "lunasi utang ke dua carita"\n• Catat Transaksi: "tadi sore jajan geprek 18rb", "bayar gacoan 26364 pake bca"\n• Cek Saldo: "berapa saldo sekarang?" atau "cek dompet dong"\n• Atur Saldo: "di dana ada 600 perak"`;
         await sendTelegramMessage(chatId, replyGreeting);
         return new Response("OK", { status: 200 });
       }
 
-      // F. Maksud: Pencatatan Transaksi
+      // I. Maksud: Pencatatan Transaksi Biasa
       if (parsedData.amount && parsedData.amount > 0) {
         const { data: txResult, error: txError } = await supabase.rpc("create_transaction_from_bot", {
           p_chat_id: chatId,
@@ -514,8 +671,8 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // G. Maksud Lain / Tidak Dikenali
-      const helpMsg = `Saya belum memahami pesan tersebut.\n\nContoh yang bisa kamu ketik:\n• "cek dompet dong" (tanya saldo dompet tertentu)\n• "di dana ada 600 perak" (atur saldo dompet)\n• "tadi sore jajan geprek 18rb" (catat pengeluaran)\n• "bukan bca, tapi tunai" (ralat transaksi terakhir)\n• "batalkan transaksi tadi" (hapus transaksi terakhir)\natau kirim foto struk kasir / bukti transfer.`;
+      // J. Maksud Lain / Tidak Dikenali
+      const helpMsg = `Saya belum memahami pesan tersebut.\n\nContoh yang bisa kamu ketik:\n• "ngutang dulu ke dua carita 26364" (catat utang)\n• "masukkan ke piutang budi 50rb" (catat piutang)\n• "cek utang" (daftar utang & piutang)\n• "tadi sore jajan geprek 18rb" (catat pengeluaran)\n• "cek dompet dong" (tanya saldo dompet)\natau kirim foto struk kasir / bukti pembayaran.`;
       await sendTelegramMessage(chatId, helpMsg);
       return new Response("OK", { status: 200 });
     }
