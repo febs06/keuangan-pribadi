@@ -34,7 +34,7 @@ const CANDIDATE_TEXT_MODELS = [
 ];
 
 // Fungsi kirim pesan balasan ke Telegram
-async function sendTelegramMessage(chatId: string | number, text: string) {
+async function sendTelegramMessage(chatId: string | number, text: string, recordLog = true) {
   const url = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
   try {
     const res = await fetch(url, {
@@ -47,9 +47,25 @@ async function sendTelegramMessage(chatId: string | number, text: string) {
     });
     if (!res.ok) {
       console.error("Gagal kirim telegram, status:", res.status, await res.text());
+    } else if (recordLog) {
+      await recordChatMessage(chatId, "model", text);
     }
   } catch (err) {
     console.error("Gagal mengirim balasan Telegram:", err);
+  }
+}
+
+// Fungsi pencatatan riwayat percakapan ke database
+async function recordChatMessage(chatId: string | number, role: "user" | "model", content: string) {
+  if (!content || !content.trim()) return;
+  try {
+    await supabase.rpc("save_bot_chat_message", {
+      p_chat_id: String(chatId),
+      p_role: role,
+      p_content: content.trim(),
+    });
+  } catch (err) {
+    console.warn("Gagal mencatat log riwayat chat:", err);
   }
 }
 
@@ -103,6 +119,19 @@ function formatFinancialContextForPrompt(ctx: any): string {
   }
 
   out += `• Pengeluaran Hari Ini: Rp ${Number(ctx.spent_today || 0).toLocaleString('id-ID')}\n`;
+  return out;
+}
+
+// Format riwayat percakapan sebelumnya untuk prompt Gemini AI
+function formatChatHistoryForPrompt(history: any): string {
+  if (!history || !Array.isArray(history) || history.length === 0) return "";
+  let out = `RIWAYAT PERCAKAPAN SEBELUMNYA (GUNAKAN UNTUK MEMAHAMI KONTEKS LANJUTAN):\n`;
+  for (const item of history) {
+    if (!item.content) continue;
+    const speaker = item.role === "user" ? "Pengguna (Febri)" : "Asisten AI";
+    out += `${speaker}: ${item.content}\n`;
+  }
+  out += `--- (AKHIR RIWAYAT PERCAKAPAN) ---\n\n`;
   return out;
 }
 
@@ -359,14 +388,18 @@ Kembalikan HANYA JSON MURNI tanpa markdown:
 }
 
 // Analisis Pesan Teks Bahasa Sehari-hari dengan Gemini AI Asisten Finansial
-async function analyzeTextWithGemini(text: string, finContext?: any) {
+async function analyzeTextWithGemini(text: string, finContext?: any, chatHistory?: any) {
   const contextString = formatFinancialContextForPrompt(finContext);
+  const historyString = formatChatHistoryForPrompt(chatHistory);
   const prompt = `Kamu adalah Asisten Finansial Pribadi yang cerdas, ramah, dan teliti untuk Febri.
 
 ${contextString}
 
-TUGAS UTAMA:
+${historyString}TUGAS UTAMA:
 Analisis pesan pengguna bahasa Indonesia berikut: "${text}"
+
+PENTING TENTANG MEMORI KONTEKS:
+Perhatikan riwayat percakapan di atas jika ada. Jika pengguna menanyakan hal lanjutan (seperti "bisa dicicil 5 kali", "kalau ditabung sampe waktu itu", "berarti dapat berapa"), HUBUNGKAN dengan fakta yang sudah dibicarakan sebelumnya (seperti nominal UKT Rp 5.000.000, target bulan, pendapatan harian Rp 50.000, atau topik yang baru saja dibahas). JANGAN bertanya ulang tentang hal yang sudah disebutkan pengguna di riwayat percakapan!
 
 ATURAN KLASIFIKASI & RESPON:
 1. JIKA AKSI PENCATATAN / PERUBAHAN DATABASE:
@@ -553,13 +586,22 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
+      // Catat pesan pengguna ke memori riwayat chat
+      await recordChatMessage(chatId, "user", text);
+
       // Ambil snapshot data finansial terkini secara real-time untuk memberi konteks pada AI
       const { data: finContext } = await supabase.rpc("get_bot_financial_context", {
         p_chat_id: chatId,
       });
 
-      // Analisis Pesan dengan Gemini AI berbekal Konteks Finansial Lengkap
-      const parsedData = await analyzeTextWithGemini(text, finContext);
+      // Ambil riwayat percakapan sebelumnya (10 pesan terakhir)
+      const { data: chatHistory } = await supabase.rpc("get_bot_chat_history", {
+        p_chat_id: chatId,
+        p_limit: 10,
+      });
+
+      // Analisis Pesan dengan Gemini AI berbekal Konteks Finansial Lengkap & Memori Chat
+      const parsedData = await analyzeTextWithGemini(text, finContext, chatHistory);
 
       // A. Maksud: Jawaban Percakapan / Konsultasi / Jawaban Fleksibel AI
       if (parsedData.intent === "conversational_advice" && parsedData.answer) {
