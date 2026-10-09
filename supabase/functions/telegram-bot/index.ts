@@ -77,6 +77,8 @@ function extractIndonesianNominal(text: string): number {
   }
 
   return 0;
+}
+
 // Format data konteks keuangan untuk prompt Gemini AI
 function formatFinancialContextForPrompt(ctx: any): string {
   if (!ctx || !ctx.success) return "Data keuangan saat ini belum tersedia di database.";
