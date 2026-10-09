@@ -77,10 +77,35 @@ function extractIndonesianNominal(text: string): number {
   }
 
   return 0;
+// Format data konteks keuangan untuk prompt Gemini AI
+function formatFinancialContextForPrompt(ctx: any): string {
+  if (!ctx || !ctx.success) return "Data keuangan saat ini belum tersedia di database.";
+
+  let out = `DATA KEUANGAN REAL-TIME PENGGUNA (FEBRI) SAAT INI (${ctx.today}):\n`;
+  out += `• Total Saldo Kas Aktif: Rp ${Number(ctx.total_balance || 0).toLocaleString('id-ID')}\n`;
+  if (ctx.wallets && ctx.wallets.length > 0) {
+    out += `  Rincian Dompet: ` + ctx.wallets.map((w: any) => `${w.name}: Rp ${Number(w.balance || 0).toLocaleString('id-ID')}`).join(", ") + `\n`;
+  }
+
+  out += `• Status Anggaran Bulan Ini (${ctx.month_label}):\n`;
+  if (ctx.budgets && ctx.budgets.length > 0) {
+    out += ctx.budgets.map((b: any) => `  - ${b.category}: Limit Rp ${Number(b.limit || 0).toLocaleString('id-ID')}, Terpakai Rp ${Number(b.spent || 0).toLocaleString('id-ID')} (${b.pct}%), Sisa Rp ${Number(b.remaining || 0).toLocaleString('id-ID')}`).join("\n") + "\n";
+    out += `  Total Anggaran: Limit Rp ${Number(ctx.total_budget_limit || 0).toLocaleString('id-ID')}, Terpakai Rp ${Number(ctx.total_budget_spent || 0).toLocaleString('id-ID')}, Sisa Rp ${Number(ctx.total_budget_remaining || 0).toLocaleString('id-ID')}\n`;
+  } else {
+    out += `  (Belum ada anggaran per kategori yang disetel untuk bulan ini)\n`;
+  }
+
+  out += `• Utang & Piutang: Utang Rp ${Number(ctx.total_debt || 0).toLocaleString('id-ID')}, Piutang Rp ${Number(ctx.total_receivable || 0).toLocaleString('id-ID')}\n`;
+  if (ctx.debts && ctx.debts.length > 0) {
+    out += `  Rincian: ` + ctx.debts.map((d: any) => `${d.type === 'debt' ? 'Utang ke' : 'Piutang di'} ${d.person}: Rp ${Number(d.amount || 0).toLocaleString('id-ID')}`).join(", ") + `\n`;
+  }
+
+  out += `• Pengeluaran Hari Ini: Rp ${Number(ctx.spent_today || 0).toLocaleString('id-ID')}\n`;
+  return out;
 }
 
 // Fallback Parser Cepat untuk Bahasa Indonesia jika Gemini offline / timeout
-function fallbackParseIndonesianText(text: string) {
+function fallbackParseIndonesianText(text: string, finContext?: any) {
   const lower = text.toLowerCase().trim();
 
   // 1. Deteksi pembatalan / hapus transaksi terakhir
@@ -106,11 +131,22 @@ function fallbackParseIndonesianText(text: string) {
     return { intent: "correct_transaction", new_wallet_name };
   }
 
-  // 3. Deteksi cek sisa anggaran / budget / jatah belanja
+  // 3. Deteksi pertanyaan sisa uang yang boleh dibelanjakan / jatah belanja
+  if (/(sisa\s+uang|jatah|dana).*(belanja|jajan|dibelanjakan)/i.test(lower)) {
+    if (finContext && finContext.total_budget_remaining !== undefined) {
+      const budgetText = finContext.budgets && finContext.budgets.length > 0
+        ? finContext.budgets.map((b: any) => `• ${b.category}: sisa Rp ${Number(b.remaining || 0).toLocaleString('id-ID')}`).join("\n")
+        : "(Belum ada anggaran per kategori yang disetel)";
+      const ans = `Sisa uang yang dialokasikan di anggaran bulan ini (${finContext.month_label || 'Bulan ini'}):\n${budgetText}\n\n• Total Sisa Anggaran: Rp ${Number(finContext.total_budget_remaining || 0).toLocaleString('id-ID')}\n• Total Saldo Kas Aktif: Rp ${Number(finContext.total_balance || 0).toLocaleString('id-ID')}`;
+      return { intent: "conversational_advice", answer: ans };
+    }
+    return { intent: "check_budget", category_or_source: null };
+  }
+
+  // 4. Deteksi cek sisa anggaran / budget
   if (
     /(cek|lihat|sisa|info|berapa).*(anggaran|budget|limit)/i.test(lower) ||
     /(anggaran|budget|limit).*(apa aja|berapa|sisa|daftar|habis)/i.test(lower) ||
-    /(sisa\s+uang|jatah|dana).*(belanja|jajan|dibelanjakan)/i.test(lower) ||
     /^(\/budget|\/anggaran|budget|anggaran|cek budget|cek anggaran|sisa budget|sisa anggaran)$/i.test(lower)
   ) {
     let category: string | null = null;
@@ -320,27 +356,40 @@ Kembalikan HANYA JSON MURNI tanpa markdown:
   throw new Error("Semua model Gemini Vision gagal memproses gambar.");
 }
 
-// Analisis Pesan Teks Bahasa Sehari-hari dengan Gemini NLP
-async function analyzeTextWithGemini(text: string) {
-  const prompt = `Kamu adalah asisten keuangan pribadi cerdas. Analisis pesan pengguna bahasa Indonesia berikut: "${text}"
-Identifikasi maksud pengguna secara cerdas:
-1. "record_debt": jika pengguna mencatat UTANG atau PIUTANG (contoh: "masukkan ke piutang dua carita 26364", "ngutang dulu ke dua carita 26364", "utang ke budi 50rb", "andi pinjam uang 100rb").
-   - Jika pengguna yang berutang ke orang lain ("ngutang ke X", "pinjam ke X", "utang ke X") -> debt_type: "debt"
-   - Jika orang lain yang berutang ke pengguna ("piutang X", "masukkan ke piutang X", "X ngutang ke aku", "talangin X") -> debt_type: "receivable"
-2. "check_debt": jika menanyakan daftar utang atau piutang (contoh: "cek utang", "ada utang apa aja", "cek piutang")
-3. "settle_debt": jika melunasi utang atau piutang (contoh: "lunasi utang ke dua carita", "budi sudah bayar utang", "utang ke budi lunas")
-4. "check_budget": jika menanyakan sisa atau status anggaran / budget / sisa uang yang boleh dibelanjakan (contoh: "cek budget", "budget", "sisa anggaran makan berapa", "sisa uang yang boleh dibelanjakan berapa lagi?", "budget bulan ini", "cek limit", "anggaran apa aja", "sisa anggaran"). Jika spesifik ke kategori tertentu, sebutkan di category_or_source.
-5. "set_balance": jika pengguna menginformasikan atau mengatur saldo dompet (contoh: "di dana ada 600 perak", "saldo bca ada 50rb"). Catatan: "perak" berarti rupiah (contoh: 600 perak = 600).
-6. "correct_transaction": jika pengguna ingin meralat/mengoreksi transaksi terakhir (contoh: "bukan pake bca, tapi pake uang tunai", "bukan bca tapi dana", "ralat tadi 20rb")
-7. "delete_transaction": jika membatalkan/menghapus transaksi terakhir (contoh: "batalkan transaksi tadi", "hapus transaksi barusan", "ga jadi catat")
-8. "check_balance": jika menanyakan saldo/uang (contoh: "berapa saldo sekarang?", "cek dompet dong", "saldo bca berapa")
-9. "record_transaction": jika mencatat pengeluaran/pemasukan baru (contoh: "jajan bakso 20rb", "nemu duit 2ribu")
-10. "greeting": jika menyapa (contoh: "halo", "hai")
-11. "other": lainnya
+// Analisis Pesan Teks Bahasa Sehari-hari dengan Gemini AI Asisten Finansial
+async function analyzeTextWithGemini(text: string, finContext?: any) {
+  const contextString = formatFinancialContextForPrompt(finContext);
+  const prompt = `Kamu adalah Asisten Finansial Pribadi yang cerdas, ramah, dan teliti untuk Febri.
+
+${contextString}
+
+TUGAS UTAMA:
+Analisis pesan pengguna bahasa Indonesia berikut: "${text}"
+
+ATURAN KLASIFIKASI & RESPON:
+1. JIKA AKSI PENCATATAN / PERUBAHAN DATABASE:
+   - "record_transaction": jika pengguna mencatat pengeluaran atau pemasukan baru (misal: "jajan bakso 20rb", "nemu duit 2ribu", "bayar gacoan 25rb pake bca").
+   - "record_debt": jika mencatat utang atau piutang baru (misal: "ngutang dulu ke dua carita 26364", "masukkan ke piutang budi 50rb").
+   - "settle_debt": jika melunasi utang/piutang (misal: "lunasi utang ke dua carita").
+   - "set_balance": jika menginformasikan atau mengatur saldo dompet (misal: "di dana ada 600 perak").
+   - "correct_transaction": jika meralat/mengoreksi transaksi terakhir (misal: "bukan bca tapi dana").
+   - "delete_transaction": jika membatalkan/menghapus transaksi terakhir (misal: "batalkan transaksi tadi").
+
+2. JIKA PERTANYAAN / KONSULTASI / CHAT SANTAI / CEK ANGGARAN & SALDO:
+   - "conversational_advice": Gunakan untuk SEMUA bentuk pertanyaan, konsultasi keuangan, tanya sisa uang belanja, minta saran/analisis, tanya saldo, tanya anggaran, sapaan, atau obrolan santai.
+     Contoh pertanyaan:
+     • "sisa uang yang boleh dibelanjakan berapa lagi?"
+     • "budget" / "cek budget" / "sisa anggaran makan berapa"
+     • "apakah aman kalau mau beli kopi 25rb sekarang?"
+     • "kondisi keuanganku sekarang gimana?"
+     • "saldo bca berapa?" / "cek dompet dong"
+     • "halo" / "selamat pagi"
+     Tuliskan jawaban yang ramah, ringkas, padat, dan akurat di field "answer". Gunakan data riil pengguna di atas! Format nominal dengan Rp (misal Rp 550.000). Jawab langsung tanpa bertele-tele.
 
 Kembalikan format JSON murni:
 {
-  "intent": string,
+  "intent": "conversational_advice" | "record_transaction" | "record_debt" | "settle_debt" | "set_balance" | "correct_transaction" | "delete_transaction" | "check_budget" | "check_balance" | "other",
+  "answer": string | null,
   "debt_type": "debt" | "receivable" | null,
   "person_name": string | null,
   "new_wallet_name": "BCA" | "Dana" | "Jago" | "Dompet" | null,
@@ -385,7 +434,7 @@ Kembalikan format JSON murni:
 
   // Jika semua endpoint AI sibuk / error, gunakan fallback parser cerdas lokal
   console.log("Menggunakan fallback parser lokal untuk teks:", text);
-  return fallbackParseIndonesianText(text);
+  return fallbackParseIndonesianText(text, finContext);
 }
 
 serve(async (req) => {
@@ -502,10 +551,21 @@ serve(async (req) => {
         return new Response("OK", { status: 200 });
       }
 
-      // Analisis Pesan dengan Gemini AI (Intent Detection)
-      const parsedData = await analyzeTextWithGemini(text);
+      // Ambil snapshot data finansial terkini secara real-time untuk memberi konteks pada AI
+      const { data: finContext } = await supabase.rpc("get_bot_financial_context", {
+        p_chat_id: chatId,
+      });
 
-      // A. Maksud: Pencatatan Utang atau Piutang
+      // Analisis Pesan dengan Gemini AI berbekal Konteks Finansial Lengkap
+      const parsedData = await analyzeTextWithGemini(text, finContext);
+
+      // A. Maksud: Jawaban Percakapan / Konsultasi / Jawaban Fleksibel AI
+      if (parsedData.intent === "conversational_advice" && parsedData.answer) {
+        await sendTelegramMessage(chatId, parsedData.answer);
+        return new Response("OK", { status: 200 });
+      }
+
+      // B. Maksud: Pencatatan Utang atau Piutang
       if (parsedData.intent === "record_debt") {
         const debtType = parsedData.debt_type || (lowerText.includes("piutang") ? "receivable" : "debt");
         const person = parsedData.person_name || "Lainnya";

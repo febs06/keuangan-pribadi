@@ -24,7 +24,7 @@ function extractIndonesianNominal(text) {
   return 0;
 }
 
-function fallbackParseIndonesianText(text) {
+function fallbackParseIndonesianText(text, finContext) {
   const lower = text.toLowerCase().trim();
 
   // 1. Deteksi pembatalan
@@ -49,11 +49,22 @@ function fallbackParseIndonesianText(text) {
     return { intent: "correct_transaction", new_wallet_name };
   }
 
-  // 3. Deteksi cek sisa anggaran / budget / jatah belanja
+  // 3. Deteksi pertanyaan sisa uang yang boleh dibelanjakan / jatah belanja
+  if (/(sisa\s+uang|jatah|dana).*(belanja|jajan|dibelanjakan)/i.test(lower)) {
+    if (finContext && finContext.total_budget_remaining !== undefined) {
+      const budgetText = finContext.budgets && finContext.budgets.length > 0
+        ? finContext.budgets.map((b) => `• ${b.category}: sisa Rp ${Number(b.remaining || 0).toLocaleString('id-ID')}`).join("\n")
+        : "(Belum ada anggaran per kategori yang disetel)";
+      const ans = `Sisa uang yang dialokasikan di anggaran bulan ini (${finContext.month_label || 'Bulan ini'}):\n${budgetText}\n\n• Total Sisa Anggaran: Rp ${Number(finContext.total_budget_remaining || 0).toLocaleString('id-ID')}\n• Total Saldo Kas Aktif: Rp ${Number(finContext.total_balance || 0).toLocaleString('id-ID')}`;
+      return { intent: "conversational_advice", answer: ans };
+    }
+    return { intent: "check_budget", category_or_source: null };
+  }
+
+  // 4. Deteksi cek sisa anggaran / budget
   if (
     /(cek|lihat|sisa|info|berapa).*(anggaran|budget|limit)/i.test(lower) ||
     /(anggaran|budget|limit).*(apa aja|berapa|sisa|daftar|habis)/i.test(lower) ||
-    /(sisa\s+uang|jatah|dana).*(belanja|jajan|dibelanjakan)/i.test(lower) ||
     /^(\/budget|\/anggaran|budget|anggaran|cek budget|cek anggaran|sisa budget|sisa anggaran)$/i.test(lower)
   ) {
     let category = null;
@@ -164,9 +175,25 @@ test('Kondisi 1: Parsing Intent Cek Anggaran (check_budget)', async (t) => {
     assert.equal(res2.intent, "check_budget");
   });
 
-  await t.test('1.8: Kalimat "sisa uang yang boleh dibelanjakan berapa lagi?" mendeteksi check_budget', () => {
+  await t.test('1.8: Kalimat "sisa uang yang boleh dibelanjakan berapa lagi?" tanpa finContext mendeteksi check_budget', () => {
     const res = fallbackParseIndonesianText("sisa uang yang boleh dibelanjakan berapa lagi?");
     assert.equal(res.intent, "check_budget");
+  });
+
+  await t.test('1.9: Kalimat "sisa uang yang boleh dibelanjakan berapa lagi?" dengan finContext menghasilkan conversational_advice langsung', () => {
+    const mockContext = {
+      success: true,
+      month_label: "Okt 2026",
+      total_balance: 645588,
+      total_budget_remaining: 550000,
+      budgets: [
+        { category: "Makan/jajan", limit: 1000000, spent: 450000, remaining: 550000, pct: 45 }
+      ]
+    };
+    const res = fallbackParseIndonesianText("sisa uang yang boleh dibelanjakan berapa lagi?", mockContext);
+    assert.equal(res.intent, "conversational_advice");
+    assert.ok(res.answer.includes("Rp 550.000"));
+    assert.ok(res.answer.includes("Rp 645.588"));
   });
 });
 
