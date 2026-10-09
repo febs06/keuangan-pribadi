@@ -18,18 +18,19 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || D
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Urutan model Vision OCR (Gunakan Gemini 3.8 Flash untuk akurasi tinggi pada struk)
+// Urutan model Vision OCR resmi Google
 const CANDIDATE_VISION_MODELS = [
-  "gemini-3.8-flash",
-  "gemini-3.5-flash",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
   "gemini-flash-latest",
-  "gemini-3.5-flash-lite",
 ];
 
-// Urutan model Text NLP Cepat
+// Urutan model Text NLP Cepat resmi Google
 const CANDIDATE_TEXT_MODELS = [
-  "gemini-3.5-flash-lite",
-  "gemini-3.8-flash",
+  "gemini-2.5-flash",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
   "gemini-flash-latest",
 ];
 
@@ -300,44 +301,93 @@ function fallbackParseIndonesianText(text: string, finContext?: any) {
   return { intent: "record_transaction", type, amount, wallet_name, category_or_source, notes: text, date: null };
 }
 
-// Analisis Foto Struk / Nota dengan Gemini Vision (Model 3.8 Flash Prioritas)
+// Helper membersihkan dan mengekstrak nominal angka murni dari string / number
+function sanitizeOcrAmount(val: any): number {
+  if (typeof val === "number" && !isNaN(val)) {
+    return Math.round(val);
+  }
+  if (typeof val === "string") {
+    let clean = val.replace(/[^0-9.,]/g, "").trim();
+    if (!clean) return 0;
+    // Format 11,112.00 atau 11.112,00
+    if (clean.includes(",") && clean.includes(".")) {
+      if (clean.indexOf(".") < clean.indexOf(",")) {
+        clean = clean.split(",")[0].replace(/\./g, "");
+      } else {
+        clean = clean.split(".")[0].replace(/,/g, "");
+      }
+    } else if (clean.includes(",")) {
+      const parts = clean.split(",");
+      if (parts.length === 2 && parts[1].length === 2) {
+        clean = parts[0];
+      } else {
+        clean = clean.replace(/,/g, "");
+      }
+    } else if (clean.includes(".")) {
+      const parts = clean.split(".");
+      if (parts.length === 2 && parts[1].length === 2) {
+        clean = parts[0];
+      } else {
+        clean = clean.replace(/\./g, "");
+      }
+    }
+    return parseInt(clean, 10) || 0;
+  }
+  return 0;
+}
+
+// Analisis Foto Struk / Nota / Bukti Transfer dengan Gemini Vision
 async function analyzeReceiptWithGemini(base64Image: string, mimeType: string) {
   const todayStr = new Date().toISOString().split("T")[0];
-  const prompt = `Kamu adalah sistem OCR dan analisis struk belanja kasir / nota / bukti transfer yang SANGAT TELITI dan AKURAT.
-Analisis gambar struk belanja kasir atau bukti pembayaran ini.
+  const prompt = `Kamu adalah sistem OCR dan ekstraksi data gambar transaksi keuangan (bukti transfer bank, bukti pembayaran QRIS m-banking, struk belanja kasir fisik, nota) yang SANGAT TELITI, JUJUR, dan AKURAT.
+
+TUGAS:
+Baca dan ekstrak data transaksi dari gambar ini secara objektif. Gambar bisa berupa:
+1. Bukti Transfer Bank / Screenshot QRIS m-Banking (seperti BCA QRIS, m-BCA, Dana, Jago, Mandiri, ShopeePay).
+2. Struk fisik belanja kasir (Indomaret, Alfamart, kafe, restoran, supermarket, SPBU, dsb.).
 
 ATURAN EKSTRAKSI NOMINAL (amount):
-1. "amount": Cari dan ambil angka TOTAL AKHIR belanja yang harus dibayar konsumen (biasanya berlabel "Total Payable", "Total", "Grand Total", "Total Belanja", "Subtotal").
-   - SANGAT PENTING: JANGAN mengambil nominal pembayaran kasir sebelum kembalian (contoh: jika tertulis "Subtotal 42.000", "Total Payable 42.000", "Cash 50.000", "Change 8.000", maka "amount" adalah 42000, BUKAN 50000 dan BUKAN 100000).
-   - "amount" harus berupa angka bulat integer murni tanpa koma/titik/Rp.
+- Ekstrak total pembayaran riil yang tertulis di gambar.
+- Pada bukti transfer / QRIS (khususnya BCA QRIS / m-BCA):
+  * Cari label "Total Pembayaran", "Total Payment", "IDR ...", "Rp ...", atau "Nominal Transaksi".
+  * Jika tertera contoh "IDR 11,112.00", maka nominalnya adalah 11112 (angka desimal/sen diabaikan).
+- Pada struk kasir fisik:
+  * Ambil total akhir yang dibayar konsumen ("Total", "Total Belanja", "Grand Total", "Total Payable").
+  * Abaikan uang yang diserahkan ("Cash") jika ada kembalian ("Change").
+- PERINGATAN: DILARANG MENGARANG ANGKA DUMMY. Jika angka tidak terbaca di gambar, kembalikan 0.
 
-ATURAN DOMPET (wallet_name):
-2. "wallet_name":
-   - Jika di struk tertera metode bayar "Cash", "Tunai", atau ada "Change" (kembalian uang tunai), gunakan "Dompet".
-   - Jika tertera "Debit BCA", "BCA", "QRIS BCA", gunakan "BCA".
-   - Jika tertera "Dana" atau "QRIS Dana", gunakan "Dana".
-   - Jika tertera "Jago", gunakan "Jago".
-   - Jika tidak yakin / tidak tertulis, default ke "Dompet".
+ATURAN REKENING / DOMPET (wallet_name):
+- Cek logo atau teks sumber rekening di gambar:
+  * Jika ada logo/tulisan BCA, m-BCA, myBCA, "Tahapan Xpresi", "BCA Mobile", atau rekening pengirim BCA: pilih "BCA".
+  * Jika ada logo/tulisan DANA atau QRIS Dana: pilih "Dana".
+  * Jika ada logo/tulisan Bank Jago: pilih "Jago".
+  * Jika bayar tunai / cash pada struk fisik atau tidak tertera nama bank/e-wallet: pilih "Dompet".
+
+ATURAN PENERIMA & CATATAN (notes):
+- Ambil nama merchant atau penerima transfer langsung dari gambar:
+  * Pada QRIS/Transfer: cari label "Pembayaran ke", "Payment to", "Merchant", "Penerima", atau nama bisnis penerima (contoh: "KOALASTORE.DIGI").
+  * Pada struk kasir: ambil nama toko / resto dan rincian ringkas 1-2 barang utama jika terbaca.
+- JANGAN mengarang nama toko jika tidak ada di gambar.
 
 ATURAN KATEGORI (category_or_source):
-3. "category_or_source":
-   - "Kebutuhan": untuk pakaian, fashion, toserba, minimarket, sabun, sampo, deodoran, kosmetik, perlengkapan mandi/rumah.
-   - "Makan/jajan": untuk restoran, cafe, kedai, warung makan, gacoan, geprek, kfc, bakery, snack.
-   - "Transport": untuk SPBU, bensin, parkir, tol, gojek, grab.
-   - "Tagihan": untuk listrik, air, wifi, pulsa, kos.
+- "Makan/jajan": restoran, kafe, warung makan, kuliner, kopi, bakery, snack.
+- "Kebutuhan": minimarket, supermarket, fashion, perlengkapan, digital store/games/software, toko serba ada.
+- "Transport": bensin, SPBU, tol, parkir, ojol, tiket perjalanan.
+- "Tagihan": listrik, air, wifi, pulsa, kuota, kos, cicilan langganan.
+- "Lain-lain": jika tidak spesifik.
 
-ATURAN TANGGAL & CATATAN:
-4. "date": Ambil tanggal transaksi yang tertera di struk format YYYY-MM-DD. Perhatikan tahun pada struk (tahun sekarang 2026). Jika tanggal/tahun buram atau tidak terbaca jelas, gunakan tanggal hari ini (${todayStr}). JANGAN mengarang tahun lama!
-5. "notes": Tulis nama toko dan 1-2 ringkasan barang utama (contoh: "Fashion Boras Dago (Gatsby Deo, MZ HK)").
+ATURAN TANGGAL (date):
+- Ambil tanggal transaksi dari gambar jika terbaca jelas dengan format YYYY-MM-DD.
+- Jika tanggal di gambar buram atau tidak ada, gunakan tanggal hari ini (${todayStr}).
 
-Kembalikan HANYA JSON MURNI tanpa markdown:
+Format respon HANYA JSON MURNI tanpa teks pengantar atau markdown lain:
 {
-  "type": "expense" atau "income",
-  "amount": 42000,
-  "wallet_name": "Dompet",
+  "type": "expense",
+  "amount": 0,
+  "wallet_name": "BCA",
   "category_or_source": "Kebutuhan",
-  "notes": "Fashion Boras Dago",
-  "date": "YYYY-MM-DD"
+  "notes": "",
+  "date": "${todayStr}"
 }`;
 
   for (const model of CANDIDATE_VISION_MODELS) {
@@ -350,13 +400,13 @@ Kembalikan HANYA JSON MURNI tanpa markdown:
           contents: [
             {
               parts: [
-                { text: prompt },
                 {
                   inlineData: {
                     mimeType: mimeType || "image/jpeg",
                     data: base64Image,
                   },
                 },
+                { text: prompt },
               ],
             },
           ],
@@ -376,8 +426,30 @@ Kembalikan HANYA JSON MURNI tanpa markdown:
       const rawText = parts.map((p: any) => p.text || "").join("") || "{}";
       const cleanJson = rawText.trim().replace(/^```json/, "").replace(/```$/, "").trim();
       const parsed = JSON.parse(cleanJson);
-      if (parsed.amount && parsed.amount > 0) {
-        return parsed;
+
+      const amountNum = sanitizeOcrAmount(parsed.amount);
+      if (amountNum > 0) {
+        let walletName = parsed.wallet_name || "Dompet";
+        if (!["BCA", "Dana", "Jago", "Dompet"].includes(walletName)) {
+          if (/bca/i.test(walletName)) walletName = "BCA";
+          else if (/dana/i.test(walletName)) walletName = "Dana";
+          else if (/jago/i.test(walletName)) walletName = "Jago";
+          else walletName = "Dompet";
+        }
+
+        let txDate = parsed.date;
+        if (!txDate || !/^\d{4}-\d{2}-\d{2}$/.test(String(txDate))) {
+          txDate = todayStr;
+        }
+
+        return {
+          type: parsed.type === "income" ? "income" : "expense",
+          amount: amountNum,
+          wallet_name: walletName,
+          category_or_source: parsed.category_or_source || "Lain-lain",
+          notes: (parsed.notes || "").trim() || "Foto Struk / Bukti Transfer",
+          date: txDate,
+        };
       }
     } catch (err) {
       console.warn(`Percobaan model ${model} gagal:`, err);
@@ -522,6 +594,11 @@ serve(async (req) => {
 
       const fileDownloadUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${fileInfo.result.file_path}`;
       const imageRes = await fetch(fileDownloadUrl);
+      if (!imageRes.ok) {
+        await sendTelegramMessage(chatId, "Gagal mengunduh file gambar dari server Telegram.");
+        return new Response("OK", { status: 200 });
+      }
+
       const imageBuffer = await imageRes.arrayBuffer();
       
       const uint8 = new Uint8Array(imageBuffer);
@@ -530,7 +607,18 @@ serve(async (req) => {
         binaryStr += String.fromCharCode(uint8[i]);
       }
       const base64Image = btoa(binaryStr);
-      const mimeType = imageRes.headers.get("content-type") || "image/jpeg";
+
+      let mimeType = imageRes.headers.get("content-type") || "";
+      const filePathLower = (fileInfo.result.file_path || "").toLowerCase();
+      if (!mimeType || mimeType.includes("octet-stream") || !mimeType.startsWith("image/")) {
+        if (filePathLower.endsWith(".png")) {
+          mimeType = "image/png";
+        } else if (filePathLower.endsWith(".webp")) {
+          mimeType = "image/webp";
+        } else {
+          mimeType = "image/jpeg";
+        }
+      }
 
       let parsedData;
       try {
